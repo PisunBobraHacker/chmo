@@ -1,8 +1,7 @@
 --============================================================
---  RGB HUB MOBILE — DELTA FINAL v7
---  Все элементы меню переливаются RGB
---  Wall Check, Trigger без FOV, починены дропдаун и колорпикер
---  Aimbot / Silent / Trigger работают по игрокам и ботам
+--  RGB HUB MOBILE — DELTA FINAL v8
+--  MouseButton1Down вместо Click (фикс тапов на Delta)
+--  RGB на всех элементах, Wall Check, Trigger без FOV
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -40,40 +39,16 @@ local Theme = {
 }
 
 --========== RGB MANAGER ==========
-local RGB = {
-    enabled = true,
-    speed = 0.5,
-    elements = {},  -- {obj=..., prop=...}
-    strokes = {},   -- UIStroke
-    gradients = {}, -- UIGradient
-}
-local function rgbColor(offset)
-    return Color3.fromHSV((tick()*RGB.speed + (offset or 0)) % 1, 1, 1)
-end
-local function addRGB(obj, prop, offset)
-    table.insert(RGB.elements, {obj=obj, prop=prop, offset=offset or math.random()*0.3})
-end
-local function addRGBStroke(s, offset)
-    table.insert(RGB.strokes, {obj=s, offset=offset or math.random()*0.3})
-end
-local function addRGBGradient(g, offset)
-    table.insert(RGB.gradients, {obj=g, offset=offset or math.random()*0.3})
-end
-
--- Обновление RGB каждый кадр
+local RGB = { enabled=true, speed=0.5, elements={}, strokes={}, gradients={} }
+local function rgbColor(offset) return Color3.fromHSV((tick()*RGB.speed+(offset or 0))%1,1,1) end
+local function addRGB(obj,prop,offset) table.insert(RGB.elements,{obj=obj,prop=prop,offset=offset or math.random()*0.3}) end
+local function addRGBStroke(s,offset) table.insert(RGB.strokes,{obj=s,offset=offset or math.random()*0.3}) end
+local function addRGBGradient(g,offset) table.insert(RGB.gradients,{obj=g,offset=offset or math.random()*0.3}) end
 RunService.RenderStepped:Connect(function()
     if not RGB.enabled then return end
-    for _, e in ipairs(RGB.elements) do
-        pcall(function() e.obj[e.prop] = rgbColor(e.offset) end)
-    end
-    for _, s in ipairs(RGB.strokes) do
-        pcall(function() s.obj.Color = rgbColor(s.offset) end)
-    end
-    for _, g in ipairs(RGB.gradients) do
-        pcall(function()
-            g.obj.Color = ColorSequence.new(rgbColor(g.offset), rgbColor(g.offset + 0.3))
-        end)
-    end
+    for _,e in ipairs(RGB.elements) do pcall(function() e.obj[e.prop]=rgbColor(e.offset) end) end
+    for _,s in ipairs(RGB.strokes) do pcall(function() s.obj.Color=rgbColor(s.offset) end) end
+    for _,g in ipairs(RGB.gradients) do pcall(function() g.obj.Color=ColorSequence.new(rgbColor(g.offset),rgbColor(g.offset+0.3)) end) end
 end)
 
 --========== UTILS ==========
@@ -82,6 +57,10 @@ local function corner(p,r) return new("UICorner",{CornerRadius=UDim.new(0,r or 8
 local function stroke(p,c,t,tr) return new("UIStroke",{Color=c or Theme.Stroke,Thickness=t or 1,Transparency=tr or 0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},p) end
 local function padding(p,a) return new("UIPadding",{PaddingTop=UDim.new(0,a),PaddingBottom=UDim.new(0,a),PaddingLeft=UDim.new(0,a),PaddingRight=UDim.new(0,a)},p) end
 local function tween(o,t,p,s,d) return TweenService:Create(o,TweenInfo.new(t,s or Enum.EasingStyle.Quint,d or Enum.EasingDirection.Out),p) end
+-- Универсальный клик (MouseButton1Down надёжнее на мобилках)
+local function onClick(btn, fn)
+    btn.MouseButton1Down:Connect(fn)
+end
 
 --========== GUI ==========
 if CoreGui:FindFirstChild("RGB_Hub") then CoreGui.RGB_Hub:Destroy() end
@@ -94,13 +73,12 @@ end
 local MENU_W, MENU_H = getMenuSize()
 local SIDEBAR_W = math.clamp(MENU_W*0.22,100,140)
 
---========== FAB (RGB) ==========
+--========== FAB ==========
 local FAB_SIZE = 54
 local fab = new("TextButton",{Name="FAB",Size=UDim2.new(0,FAB_SIZE,0,FAB_SIZE),Position=UDim2.new(0,Config.Settings.FABX,0,Config.Settings.FABY),BackgroundColor3=Theme.Accent,Text="E",Font=Enum.Font.GothamBlack,TextSize=20,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=20,Visible=false},gui)
 corner(fab,FAB_SIZE/2)
 local fabStroke = stroke(fab,Color3.new(1,1,1),1.2,0)
-addRGB(fab,"BackgroundColor3",0)
-addRGBStroke(fabStroke,0.15)
+addRGB(fab,"BackgroundColor3",0); addRGBStroke(fabStroke,0.15)
 
 local fabDragging, fabStart, fabStartPos, fabMoved
 fab.InputBegan:Connect(function(input)
@@ -125,8 +103,7 @@ end)
 --========== MENU ==========
 local root = new("Frame",{Name="Menu",Size=UDim2.new(0,MENU_W,0,MENU_H),Position=UDim2.new(0.5,-MENU_W/2,0.5,-MENU_H/2),BackgroundColor3=Color3.fromRGB(18,18,24),BorderSizePixel=0,Visible=false,ZIndex=25,ClipsDescendants=false},gui)
 corner(root,14)
-local rootStroke = stroke(root,Theme.Stroke,1.5,0)
-addRGBStroke(rootStroke,0)
+local rootStroke = stroke(root,Theme.Stroke,1.5,0); addRGBStroke(rootStroke,0)
 
 local topGlow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=26},root)
 addRGB(topGlow,"BackgroundColor3",0.05)
@@ -134,13 +111,12 @@ addRGB(topGlow,"BackgroundColor3",0.05)
 local HEADER_H = 44
 local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
-local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB (DELTA) v7",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
+local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB (DELTA) v8",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
 addRGB(titleLbl,"TextColor3",0.1)
 
 local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,-40,0.5,-15),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
-corner(closeBtn,15)
-addRGB(closeBtn,"BackgroundColor3",0.2)
-closeBtn.MouseButton1Click:Connect(function() root.Visible=false; fab.Visible=true end)
+corner(closeBtn,15); addRGB(closeBtn,"BackgroundColor3",0.2)
+onClick(closeBtn, function() root.Visible=false; fab.Visible=true end)
 
 local sidebar = new("Frame",{Size=UDim2.new(0,SIDEBAR_W,1,-HEADER_H),Position=UDim2.new(0,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 padding(sidebar,8)
@@ -172,26 +148,22 @@ for i,t in ipairs(tabsList) do
     new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},page)
     addRGB(page,"ScrollBarImageColor3",math.random()*0.3)
     pages[t.Name]=page
-    btn.MouseButton1Click:Connect(function() showPage(t.Name) end)
+    onClick(btn, function() showPage(t.Name) end)
 end
 
---========== UI COMPONENTS (RGB) ==========
+--========== UI COMPONENTS ==========
 local UI = {}
 function UI.Section(page,text)
     local wrap = new("Frame",{Size=UDim2.new(1,0,0,24),BackgroundTransparency=1,ZIndex=27},page)
     local bar = new("Frame",{Size=UDim2.new(0,3,0,12),Position=UDim2.new(0,4,0.5,-6),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},wrap)
-    corner(bar,2)
-    addRGB(bar,"BackgroundColor3",math.random()*0.3)
+    corner(bar,2); addRGB(bar,"BackgroundColor3",math.random()*0.3)
     local lbl = new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},wrap)
     addRGB(lbl,"TextColor3",math.random()*0.3)
     return wrap
 end
 local function card(page,h)
     local c = new("Frame",{Size=UDim2.new(1,0,0,h or 42),BackgroundColor3=Theme.Panel,BorderSizePixel=0,ZIndex=27},page)
-    corner(c,10)
-    local s = stroke(c,Theme.Stroke,1,0.5)
-    addRGBStroke(s,math.random()*0.3)
-    return c
+    corner(c,10); local s = stroke(c,Theme.Stroke,1,0.5); addRGBStroke(s,math.random()*0.3); return c
 end
 function UI.Toggle(page,label,default,callback)
     local c = card(page,42)
@@ -199,21 +171,19 @@ function UI.Toggle(page,label,default,callback)
     local state = default or false
     local track = new("Frame",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=state and Theme.Accent or Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
     corner(track,11)
-    if state then addRGB(track,"BackgroundColor3",math.random()*0.3) end
+    local rgbEntry
+    if state then rgbEntry = {obj=track,prop="BackgroundColor3",offset=math.random()*0.3}; table.insert(RGB.elements,rgbEntry) end
     local knob = new("Frame",{Size=UDim2.new(0,18,0,18),Position=state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},track)
     corner(knob,9)
     local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=30},c)
-    local rgbEntry
-    hit.MouseButton1Click:Connect(function()
+    onClick(hit, function()
         state = not state
         if state then
-            rgbEntry = {obj=track, prop="BackgroundColor3", offset=math.random()*0.3}
-            table.insert(RGB.elements, rgbEntry)
+            rgbEntry = {obj=track,prop="BackgroundColor3",offset=math.random()*0.3}
+            table.insert(RGB.elements,rgbEntry)
         else
             tween(track,0.22,{BackgroundColor3=Theme.Panel2}):Play()
-            for i=#RGB.elements,1,-1 do
-                if RGB.elements[i]==rgbEntry then table.remove(RGB.elements,i) end
-            end
+            for i=#RGB.elements,1,-1 do if RGB.elements[i]==rgbEntry then table.remove(RGB.elements,i) end end
         end
         tween(knob,0.22,{Position=state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)}):Play()
         if callback then callback(state) end
@@ -228,8 +198,7 @@ function UI.Slider(page,label,min,max,default,callback)
     local bar = new("Frame",{Size=UDim2.new(1,-24,0,6),Position=UDim2.new(0,12,0,38),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
     corner(bar,3)
     local fill = new("Frame",{Size=UDim2.new((default-min)/(max-min),0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},bar)
-    corner(fill,3)
-    addRGB(fill,"BackgroundColor3",math.random()*0.3)
+    corner(fill,3); addRGB(fill,"BackgroundColor3",math.random()*0.3)
     local thumb = new("Frame",{Size=UDim2.new(0,12,0,12),Position=UDim2.new((default-min)/(max-min),-6,0.5,-6),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},bar)
     corner(thumb,6)
     local value = default; local dragging = false
@@ -249,9 +218,9 @@ function UI.Button(page,label,callback,color)
     local b = new("TextButton",{Size=UDim2.new(1,0,0,36),BackgroundColor3=color or Theme.Accent,Text=label,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},page)
     corner(b,10)
     if not color then addRGB(b,"BackgroundColor3",math.random()*0.3) end
-    b.MouseButton1Click:Connect(function() if callback then callback() end end); return b
+    onClick(b, function() if callback then callback() end end)
+    return b
 end
--- DROPDOWN (разделено: openHit на заголовке, опции ZIndex=80)
 function UI.Dropdown(page,label,options,default,callback)
     local c = card(page,42)
     new("TextLabel",{Size=UDim2.new(1,-110,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
@@ -267,56 +236,42 @@ function UI.Dropdown(page,label,options,default,callback)
     for _,opt in ipairs(options) do
         local ob = new("TextButton",{Size=UDim2.new(1,0,0,28),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=80},list)
         corner(ob,8)
-        ob.MouseButton1Click:Connect(function()
+        onClick(ob, function()
             current = opt; valLbl.Text = opt
             if callback then callback(opt) end
-            expanded = false
-            list.Visible = false
+            expanded = false; list.Visible = false
             tween(list,0.15,{Size=UDim2.new(1,-16,0,0)}):Play()
             tween(c,0.15,{Size=UDim2.new(1,0,0,42)}):Play()
         end)
     end
-    openHit.MouseButton1Click:Connect(function()
-        expanded = not expanded
-        list.Visible = expanded
+    onClick(openHit, function()
+        expanded = not expanded; list.Visible = expanded
         local h = math.min(#options*32+12,180)
         tween(list,0.2,{Size=UDim2.new(1,-16,0,expanded and h or 0)}):Play()
         tween(c,0.2,{Size=UDim2.new(1,0,0,expanded and (42+h+6) or 42)}):Play()
     end)
     return c
 end
--- COLORPICKER (открытие по sw, слайдеры ZIndex=85)
 function UI.ColorPicker(page,label,default,callback)
     local c = card(page,42)
     new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local sw = new("TextButton",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=80},c)
-    corner(sw,6)
-    local swStroke = stroke(sw,Theme.Stroke,1)
-    addRGBStroke(swStroke,math.random()*0.3)
+    corner(sw,6); local swStroke = stroke(sw,Theme.Stroke,1); addRGBStroke(swStroke,math.random()*0.3)
     local expanded = false
     local picker = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=80},c)
     corner(picker,10); padding(picker,8)
     local h,s,v = (default or Color3.new(1,1,1)):ToHSV()
-    local function apply()
-        local col = Color3.fromHSV(h,s,v)
-        sw.BackgroundColor3 = col
-        if callback then callback(col) end
-    end
+    local function apply() local col=Color3.fromHSV(h,s,v); sw.BackgroundColor3=col; if callback then callback(col) end end
     local function hsvSlider(name,idx,def,cb)
         local f = new("Frame",{Size=UDim2.new(1,0,0,24),Position=UDim2.new(0,0,0,idx*26),BackgroundTransparency=1,ZIndex=81},picker)
         new("TextLabel",{Size=UDim2.new(0,30,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=10,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=81},f)
         local bar = new("Frame",{Size=UDim2.new(1,-36,0,5),Position=UDim2.new(0,34,0.5,-2.5),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=81},f)
         corner(bar,3)
         local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=81},bar)
-        corner(fill,3)
-        addRGB(fill,"BackgroundColor3",math.random()*0.3)
+        corner(fill,3); addRGB(fill,"BackgroundColor3",math.random()*0.3)
         local hit = new("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,-6,0),BackgroundTransparency=1,Text="",ZIndex=85},f)
         local drag = false
-        local function upd(x)
-            local rel = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
-            fill.Size = UDim2.new(rel,0,1,0)
-            cb(rel)
-        end
+        local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); fill.Size=UDim2.new(rel,0,1,0); cb(rel) end
         hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=true; upd(input.Position.X) end end)
         UIS.InputChanged:Connect(function(input) if drag and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
         UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
@@ -324,9 +279,8 @@ function UI.ColorPicker(page,label,default,callback)
     hsvSlider("H",0,h,function(r) h=r; apply() end)
     hsvSlider("S",1,s,function(r) s=r; apply() end)
     hsvSlider("V",2,v,function(r) v=r; apply() end)
-    sw.MouseButton1Click:Connect(function()
-        expanded = not expanded
-        picker.Visible = expanded
+    onClick(sw, function()
+        expanded = not expanded; picker.Visible = expanded
         tween(picker,0.2,{Size=UDim2.new(1,-16,0,expanded and 84 or 0)}):Play()
         tween(c,0.2,{Size=UDim2.new(1,0,0,expanded and 132 or 42)}):Play()
     end)
@@ -368,9 +322,6 @@ UI.Toggle(pages.Silent,"Wall Check",Config.Silent.WallCheck,function(v) Config.S
 UI.Section(pages.Silent,"Advanced")
 UI.Toggle(pages.Silent,"Hitbox Random",Config.Silent.HitboxRandom,function(v) Config.Silent.HitboxRandom=v end)
 UI.Slider(pages.Silent,"Delay (ms)",0,500,Config.Silent.Delay,function(v) Config.Silent.Delay=v end)
-UI.Section(pages.Silent,"FOV Circle")
-UI.Toggle(pages.Silent,"Show FOV",Config.Silent.ShowFOV,function(v) Config.Silent.ShowFOV=v end)
-UI.ColorPicker(pages.Silent,"FOV Color",Config.Silent.FOVColor,function(c) Config.Silent.FOVColor=c end)
 
 UI.Section(pages.Trigger,"Main")
 UI.Toggle(pages.Trigger,"Enabled",Config.Trigger.Enabled,function(v) Config.Trigger.Enabled=v end)
@@ -397,16 +348,15 @@ UI.Toggle(pages.Settings,"RGB Menu",Config.Settings.RGBMenu,function(v) RGB.enab
 UI.Button(pages.Settings,"Destroy Hub",function() gui:Destroy() end,Theme.Danger)
 
 showPage("Visual")
-
 root.Visible = true
 fab.Visible = false
-fab.MouseButton1Click:Connect(function()
+onClick(fab, function()
     if fabMoved then return end
     root.Visible = true; fab.Visible = false; showPage("Visual")
 end)
 
 --============================================================
---  ESP LOGIC
+--  ESP LOGIC (без изменений)
 --============================================================
 local ESP_Store = {}
 local Chams_Store = {}
@@ -612,9 +562,7 @@ Players.PlayerRemoving:Connect(function(p)
     if Chams_Store[p] then Chams_Store[p]:Destroy(); Chams_Store[p]=nil end
 end)
 
---============================================================
---  TARGET SELECTION (игроки + боты)
---============================================================
+--========== TARGET ==========
 local function isVisible(part)
     if not part then return false end
     local origin = Camera.CFrame.Position
@@ -632,9 +580,7 @@ local function collectTargets(cfg)
         if p~=LocalPlayer and p.Character then
             local part = p.Character:FindFirstChild(cfg.Part)
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
-            if part and hum and hum.Health>0 then
-                table.insert(list,{part=part, hum=hum, char=p.Character})
-            end
+            if part and hum and hum.Health>0 then table.insert(list,{part=part, hum=hum, char=p.Character}) end
         end
     end
     if cfg.TargetBots then
@@ -642,9 +588,7 @@ local function collectTargets(cfg)
             if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
                 local part = obj:FindFirstChild(cfg.Part)
                 local hum = obj:FindFirstChildOfClass("Humanoid")
-                if part and hum and hum.Health>0 then
-                    table.insert(list,{part=part, hum=hum, char=obj})
-                end
+                if part and hum and hum.Health>0 then table.insert(list,{part=part, hum=hum, char=obj}) end
             end
         end
     end
@@ -767,7 +711,7 @@ RunService.RenderStepped:Connect(function()
     if not Config.Trigger.Enabled then return end
     if Config.Trigger.Key and not isKeyActive(Config.Trigger.Key) then return end
     if tick()-lastTrigger < Config.Trigger.Delay/1000 then return end
-    local target = getTarget(Config.Trigger, false)  -- без FOV
+    local target = getTarget(Config.Trigger, false)
     if target then
         lastTrigger = tick()
         if mouse1click then mouse1click()
@@ -775,4 +719,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[RGB HUB DELTA v7] Loaded. RGB menu, wall check, trigger no FOV.")
+print("[RGB HUB DELTA v8] Loaded. MouseButton1Down fix.")
