@@ -1,6 +1,6 @@
 --============================================================
---  RGB HUB MOBILE — v11 (OPTIMIZED)
---  RGB 15Hz, ESP 30Hz, боты раз в 0.5с, без UIStroke на карточках
+--  RGB HUB MOBILE — v12 (TRIGGER SAFE)
+--  Trigger через Raycast + временный Silent Aim (без mouse1click)
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -24,7 +24,7 @@ local Config = {
     },
     Aimbot = { Enabled=false, FOV=120, Smooth=0.35, Part="Head", Mode="Camera", WallCheck=false, Priority="Distance", ShowFOV=true, FOVColor=Color3.fromRGB(255,255,255), FOVThickness=1, FOVTransparency=0.6, FOVFilled=false, TargetBots=true },
     Silent = { Enabled=false, FOV=120, Part="Head", WallCheck=false, Priority="Distance", HitboxRandom=false, ShowFOV=false, FOVColor=Color3.fromRGB(130,90,255), FOVThickness=1, FOVTransparency=0.6, FOVFilled=false, Delay=0, TargetBots=true },
-    Trigger = { Enabled=false, Part="Head", WallCheck=true, Delay=80, ShowFOV=false, FOVColor=Color3.fromRGB(255,80,80), FOVThickness=1, FOVTransparency=0.6, FOVFilled=false, TargetBots=true },
+    Trigger = { Enabled=false, Part="Head", WallCheck=true, Delay=80, TargetBots=true },
     Settings = { FABX=20, FABY=120, RGBMenu=true },
 }
 
@@ -32,21 +32,18 @@ local Config = {
 local Theme = {
     Bg=Color3.fromRGB(14,14,18), Bg2=Color3.fromRGB(20,20,26),
     Panel=Color3.fromRGB(26,26,33), Panel2=Color3.fromRGB(32,32,40),
-    Stroke=Color3.fromRGB(48,48,60), Accent=Color3.fromRGB(130,90,255),
-    Accent2=Color3.fromRGB(80,200,255), Text=Color3.fromRGB(235,235,245),
+    Accent=Color3.fromRGB(130,90,255), Text=Color3.fromRGB(235,235,245),
     TextDim=Color3.fromRGB(140,140,155), Danger=Color3.fromRGB(220,70,90),
 }
 
 --========== RGB MANAGER (15 Hz) ==========
-local RGB = { enabled=true, speed=0.5, elements={}, strokes={} }
+local RGB = { enabled=true, speed=0.5, elements={} }
 local function rgbColor(offset) return Color3.fromHSV((tick()*RGB.speed+(offset or 0))%1,1,1) end
 local function addRGB(obj,prop,offset) table.insert(RGB.elements,{obj=obj,prop=prop,offset=offset or math.random()*0.3}) end
-local function addRGBStroke(s,offset) table.insert(RGB.strokes,{obj=s,offset=offset or math.random()*0.3}) end
 task.spawn(function()
     while task.wait(0.066) do
         if not RGB.enabled then continue end
         for _,e in ipairs(RGB.elements) do pcall(function() e.obj[e.prop]=rgbColor(e.offset) end) end
-        for _,s in ipairs(RGB.strokes) do pcall(function() s.obj.Color=rgbColor(s.offset) end) end
     end
 end)
 
@@ -55,8 +52,6 @@ local function new(c,p,parent) local o=Instance.new(c); for k,v in pairs(p or {}
 local function corner(p,r) return new("UICorner",{CornerRadius=UDim.new(0,r or 8)},p) end
 local function padding(p,a) return new("UIPadding",{PaddingTop=UDim.new(0,a),PaddingBottom=UDim.new(0,a),PaddingLeft=UDim.new(0,a),PaddingRight=UDim.new(0,a)},p) end
 local function tween(o,t,p,s,d) return TweenService:Create(o,TweenInfo.new(t,s or Enum.EasingStyle.Quint,d or Enum.EasingDirection.Out),p) end
-
---========== ПРИМИТИВНЫЙ ТАП ==========
 local function onTap(guiObject, callback)
     guiObject.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -68,53 +63,29 @@ end
 --========== GUI ==========
 if CoreGui:FindFirstChild("RGB_Hub") then CoreGui.RGB_Hub:Destroy() end
 local gui = new("ScreenGui",{Name="RGB_Hub",ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},CoreGui)
-
-local function getMenuSize()
-    local vp = Camera.ViewportSize
-    return math.clamp(vp.X*0.92,320,640), math.clamp(vp.Y*0.78,260,440)
-end
+local function getMenuSize() local vp=Camera.ViewportSize; return math.clamp(vp.X*0.92,320,640), math.clamp(vp.Y*0.78,260,440) end
 local MENU_W, MENU_H = getMenuSize()
 local SIDEBAR_W = math.clamp(MENU_W*0.22,100,140)
 
---========== FAB ==========
-local FAB_SIZE = 54
+-- FAB
+local FAB_SIZE=54
 local fab = new("TextButton",{Name="FAB",Size=UDim2.new(0,FAB_SIZE,0,FAB_SIZE),Position=UDim2.new(0,Config.Settings.FABX,0,Config.Settings.FABY),BackgroundColor3=Theme.Accent,Text="E",Font=Enum.Font.GothamBlack,TextSize=20,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=20,Visible=false},gui)
-corner(fab,FAB_SIZE/2)
-addRGB(fab,"BackgroundColor3",0)
-
+corner(fab,FAB_SIZE/2); addRGB(fab,"BackgroundColor3",0)
 local fabDragging, fabStart, fabStartPos, fabMoved
-fab.InputBegan:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
-        fabDragging=true; fabMoved=false; fabStart=input.Position; fabStartPos=fab.Position
-    end
-end)
-UIS.InputChanged:Connect(function(input)
-    if fabDragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then
-        local d = input.Position-fabStart
-        if math.abs(d.X)>4 or math.abs(d.Y)>4 then fabMoved=true end
-        fab.Position = UDim2.new(fabStartPos.X.Scale,fabStartPos.X.Offset+d.X,fabStartPos.Y.Scale,fabStartPos.Y.Offset+d.Y)
-    end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
-        if fabDragging then Config.Settings.FABX=fab.Position.X.Offset; Config.Settings.FABY=fab.Position.Y.Offset end
-        fabDragging=false
-    end
-end)
+fab.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then fabDragging=true; fabMoved=false; fabStart=input.Position; fabStartPos=fab.Position end end)
+UIS.InputChanged:Connect(function(input) if fabDragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then local d=input.Position-fabStart; if math.abs(d.X)>4 or math.abs(d.Y)>4 then fabMoved=true end; fab.Position=UDim2.new(fabStartPos.X.Scale,fabStartPos.X.Offset+d.X,fabStartPos.Y.Scale,fabStartPos.Y.Offset+d.Y) end end)
+UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then if fabDragging then Config.Settings.FABX=fab.Position.X.Offset; Config.Settings.FABY=fab.Position.Y.Offset end; fabDragging=false end end)
 
---========== MENU ==========
+-- MENU
 local root = new("Frame",{Name="Menu",Size=UDim2.new(0,MENU_W,0,MENU_H),Position=UDim2.new(0.5,-MENU_W/2,0.5,-MENU_H/2),BackgroundColor3=Color3.fromRGB(18,18,24),BorderSizePixel=0,Visible=false,ZIndex=25,ClipsDescendants=false},gui)
 corner(root,14)
-
 local topGlow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=26},root)
 addRGB(topGlow,"BackgroundColor3",0.05)
-
-local HEADER_H = 44
+local HEADER_H=44
 local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
-local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v11",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
+local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v12",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
 addRGB(titleLbl,"TextColor3",0.1)
-
 local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,-40,0.5,-15),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
 corner(closeBtn,15); addRGB(closeBtn,"BackgroundColor3",0.2)
 onTap(closeBtn, function() root.Visible=false; fab.Visible=true end)
@@ -122,7 +93,6 @@ onTap(closeBtn, function() root.Visible=false; fab.Visible=true end)
 local sidebar = new("Frame",{Size=UDim2.new(0,SIDEBAR_W,1,-HEADER_H),Position=UDim2.new(0,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 padding(sidebar,8)
 new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
-
 local content = new("Frame",{Size=UDim2.new(1,-(SIDEBAR_W+10),1,-(HEADER_H+10)),Position=UDim2.new(0,SIDEBAR_W,0,HEADER_H),BackgroundTransparency=1,ZIndex=26,ClipsDescendants=false},root)
 
 local pages, tabButtons = {}, {}
@@ -131,52 +101,31 @@ local tabsList = {
     {Name="Trigger",Icon="✹"},{Name="Colors",Icon="◐"},{Name="Settings",Icon="⚙"},
 }
 
---========== СТРАНИЦА СО СЛАЙДЕРОМ ==========
 local function createPage(name)
     local page = new("Frame",{Name=name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=27,ClipsDescendants=true},content)
     local inner = new("Frame",{Name="Inner",Size=UDim2.new(1,0,0,0),BackgroundTransparency=1,BorderSizePixel=0,Position=UDim2.new(0,0,0,0),ZIndex=27},page)
     local layout = new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},inner)
-
     local scrollBar = new("Frame",{Size=UDim2.new(0,4,1,-8),Position=UDim2.new(1,-8,0,4),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=40},page)
     corner(scrollBar,2)
-    local scrollThumb = new("Frame",{Size=UDim2.new(1,0,0,40),Position=UDim2.new(0,0,0,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=41},scrollBar)
+    local scrollThumb = new("Frame",{Size=UDim2.new(1,0,0,40),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=41},scrollBar)
     corner(scrollThumb,2); addRGB(scrollThumb,"BackgroundColor3",math.random()*0.3)
-
-    local scrollValue = 0
-    local maxScroll = 0
+    local scrollValue, maxScroll = 0, 0
     local function updateScroll()
         local contentH = layout.AbsoluteContentSize.Y + 12
         inner.Size = UDim2.new(1,0,0,contentH)
         maxScroll = math.max(0, contentH - page.AbsoluteSize.Y)
         local thumbH = math.clamp(page.AbsoluteSize.Y/math.max(contentH,1),0.08,1)*page.AbsoluteSize.Y
         scrollThumb.Size = UDim2.new(1,0,0,thumbH)
-        local thumbY = scrollValue*(page.AbsoluteSize.Y-thumbH)
-        scrollThumb.Position = UDim2.new(0,0,0,thumbY)
+        scrollThumb.Position = UDim2.new(0,0,0,scrollValue*(page.AbsoluteSize.Y-thumbH))
         inner.Position = UDim2.new(0,0,0,-scrollValue*maxScroll)
     end
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateScroll)
     page:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateScroll)
-
-    scrollBar.InputBegan:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
-            local relY = math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1)
-            scrollValue = relY; updateScroll()
-        end
-    end)
-    local dragging = false
-    scrollThumb.InputBegan:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end
-    end)
-    UIS.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then
-            local relY = math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1)
-            scrollValue = relY; updateScroll()
-        end
-    end)
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
-    end)
-
+    scrollBar.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then scrollValue=math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1); updateScroll() end end)
+    local dragging=false
+    scrollThumb.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end end)
+    UIS.InputChanged:Connect(function(input) if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then scrollValue=math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1); updateScroll() end end)
+    UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
     return page, inner, layout
 end
 
@@ -199,10 +148,9 @@ for i,t in ipairs(tabsList) do
     onTap(btn, function() showPage(t.Name) end)
 end
 
---========== UI COMPONENTS (без UIStroke) ==========
+--========== UI COMPONENTS ==========
 local UI = {}
 local function getPageInner(page) return page:FindFirstChild("Inner") or page end
-
 function UI.Section(page,text)
     local inner = getPageInner(page)
     local wrap = new("Frame",{Size=UDim2.new(1,0,0,24),BackgroundTransparency=1,ZIndex=27},inner)
@@ -213,8 +161,7 @@ function UI.Section(page,text)
 end
 local function card(parent,h)
     local c = new("Frame",{Size=UDim2.new(1,0,0,h or 42),BackgroundColor3=Theme.Panel,BorderSizePixel=0,ZIndex=27},parent)
-    corner(c,10)
-    return c
+    corner(c,10); return c
 end
 function UI.Toggle(page,label,default,callback)
     local inner = getPageInner(page)
@@ -230,13 +177,8 @@ function UI.Toggle(page,label,default,callback)
     local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=30},c)
     onTap(hit, function()
         state = not state
-        if state then
-            rgbEntry = {obj=track,prop="BackgroundColor3",offset=math.random()*0.3}
-            table.insert(RGB.elements,rgbEntry)
-        else
-            tween(track,0.22,{BackgroundColor3=Theme.Panel2}):Play()
-            for i=#RGB.elements,1,-1 do if RGB.elements[i]==rgbEntry then table.remove(RGB.elements,i) end end
-        end
+        if state then rgbEntry = {obj=track,prop="BackgroundColor3",offset=math.random()*0.3}; table.insert(RGB.elements,rgbEntry)
+        else tween(track,0.22,{BackgroundColor3=Theme.Panel2}):Play(); for i=#RGB.elements,1,-1 do if RGB.elements[i]==rgbEntry then table.remove(RGB.elements,i) end end end
         tween(knob,0.22,{Position=state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)}):Play()
         if callback then callback(state) end
     end)
@@ -253,14 +195,9 @@ function UI.Slider(page,label,min,max,default,callback)
     corner(fill,3)
     local thumb = new("Frame",{Size=UDim2.new(0,12,0,12),Position=UDim2.new((default-min)/(max-min),-6,0.5,-6),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},bar)
     corner(thumb,6)
-    local value = default; local dragging = false
+    local value, dragging = default, false
     local hit = new("TextButton",{Size=UDim2.new(1,0,0,30),Position=UDim2.new(0,0,0,24),BackgroundTransparency=1,Text="",ZIndex=30},c)
-    local function upd(x)
-        local rel = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
-        value = math.floor(min+(max-min)*rel+0.5)
-        fill.Size = UDim2.new(rel,0,1,0); thumb.Position = UDim2.new(rel,-6,0.5,-6); val.Text = tostring(value)
-        if callback then callback(value) end
-    end
+    local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); value=math.floor(min+(max-min)*rel+0.5); fill.Size=UDim2.new(rel,0,1,0); thumb.Position=UDim2.new(rel,-6,0.5,-6); val.Text=tostring(value); if callback then callback(value) end end
     hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; upd(input.Position.X) end end)
     UIS.InputChanged:Connect(function(input) if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
     UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
@@ -269,10 +206,8 @@ end
 function UI.Button(page,label,callback,color)
     local inner = getPageInner(page)
     local b = new("TextButton",{Size=UDim2.new(1,0,0,36),BackgroundColor3=color or Theme.Accent,Text=label,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},inner)
-    corner(b,10)
-    if not color then addRGB(b,"BackgroundColor3",math.random()*0.3) end
-    onTap(b, function() if callback then callback() end end)
-    return b
+    corner(b,10); if not color then addRGB(b,"BackgroundColor3",math.random()*0.3) end
+    onTap(b, function() if callback then callback() end end); return b
 end
 function UI.Dropdown(page,label,options,default,callback)
     local inner = getPageInner(page)
@@ -281,7 +216,7 @@ function UI.Dropdown(page,label,options,default,callback)
     local current = default or options[1]
     local valLbl = new("TextLabel",{Size=UDim2.new(0,80,1,0),Position=UDim2.new(1,-96,0,0),BackgroundTransparency=1,Text=current,Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
     new("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(1,-14,0,0),BackgroundTransparency=1,Text="▾",Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.TextDim,ZIndex=28},c)
-    local openHit = new("TextButton",{Size=UDim2.new(1,-56,1,0),Position=UDim2.new(0,0,0,0),BackgroundTransparency=1,Text="",ZIndex=76},c)
+    local openHit = new("TextButton",{Size=UDim2.new(1,-56,1,0),BackgroundTransparency=1,Text="",ZIndex=76},c)
     local expanded = false
     local list = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=70},c)
     corner(list,10); padding(list,6)
@@ -290,16 +225,15 @@ function UI.Dropdown(page,label,options,default,callback)
         local ob = new("TextButton",{Size=UDim2.new(1,0,0,28),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=80},list)
         corner(ob,8)
         onTap(ob, function()
-            current = opt; valLbl.Text = opt
-            if callback then callback(opt) end
-            expanded = false; list.Visible = false
+            current=opt; valLbl.Text=opt; if callback then callback(opt) end
+            expanded=false; list.Visible=false
             tween(list,0.15,{Size=UDim2.new(1,-16,0,0)}):Play()
             tween(c,0.15,{Size=UDim2.new(1,0,0,42)}):Play()
         end)
     end
     onTap(openHit, function()
-        expanded = not expanded; list.Visible = expanded
-        local h = math.min(#options*32+12,180)
+        expanded=not expanded; list.Visible=expanded
+        local h=math.min(#options*32+12,180)
         tween(list,0.2,{Size=UDim2.new(1,-16,0,expanded and h or 0)}):Play()
         tween(c,0.2,{Size=UDim2.new(1,0,0,expanded and (42+h+6) or 42)}):Play()
     end)
@@ -311,10 +245,10 @@ function UI.ColorPicker(page,label,default,callback)
     new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local sw = new("TextButton",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=80},c)
     corner(sw,6)
-    local expanded = false
+    local expanded=false
     local picker = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=80},c)
     corner(picker,10); padding(picker,8)
-    local h,s,v = (default or Color3.new(1,1,1)):ToHSV()
+    local h,s,v=(default or Color3.new(1,1,1)):ToHSV()
     local function apply() local col=Color3.fromHSV(h,s,v); sw.BackgroundColor3=col; if callback then callback(col) end end
     local function hsvSlider(name,idx,def,cb)
         local f = new("Frame",{Size=UDim2.new(1,0,0,24),Position=UDim2.new(0,0,0,idx*26),BackgroundTransparency=1,ZIndex=81},picker)
@@ -324,7 +258,7 @@ function UI.ColorPicker(page,label,default,callback)
         local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=81},bar)
         corner(fill,3)
         local hit = new("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,-6,0),BackgroundTransparency=1,Text="",ZIndex=85},f)
-        local drag = false
+        local drag=false
         local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); fill.Size=UDim2.new(rel,0,1,0); cb(rel) end
         hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=true; upd(input.Position.X) end end)
         UIS.InputChanged:Connect(function(input) if drag and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
@@ -334,7 +268,7 @@ function UI.ColorPicker(page,label,default,callback)
     hsvSlider("S",1,s,function(r) s=r; apply() end)
     hsvSlider("V",2,v,function(r) v=r; apply() end)
     onTap(sw, function()
-        expanded = not expanded; picker.Visible = expanded
+        expanded=not expanded; picker.Visible=expanded
         tween(picker,0.2,{Size=UDim2.new(1,-16,0,expanded and 84 or 0)}):Play()
         tween(c,0.2,{Size=UDim2.new(1,0,0,expanded and 132 or 42)}):Play()
     end)
@@ -352,8 +286,7 @@ UI.Toggle(pages.Visual,"Health Bar",Config.Visual.HP,function(v) Config.Visual.H
 UI.Toggle(pages.Visual,"Names",Config.Visual.Names,function(v) Config.Visual.Names=v end)
 UI.Toggle(pages.Visual,"Distance",Config.Visual.Distance,function(v) Config.Visual.Distance=v end)
 UI.Toggle(pages.Visual,"Bots ESP",Config.Visual.Bots,function(v) Config.Visual.Bots=v end)
-UI.Slider(pages.Visual,"Max Distance (0=off)",0,2000,Config.Visual.MaxDistance,function(v) Config.Visual.MaxDistance=v end)
-UI.Section(pages.Visual,"RGB")
+UI.Slider(pages.Visual,"Max Distance",0,2000,Config.Visual.MaxDistance,function(v) Config.Visual.MaxDistance=v end)
 UI.Toggle(pages.Visual,"RGB Tracers",Config.Colors.RGB,function(v) Config.Colors.RGB=v end)
 
 UI.Section(pages.Aimbot,"Main")
@@ -362,10 +295,8 @@ UI.Dropdown(pages.Aimbot,"Mode",{"Camera","Mouse"},Config.Aimbot.Mode,function(v
 UI.Dropdown(pages.Aimbot,"Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},Config.Aimbot.Part,function(v) Config.Aimbot.Part=v end)
 UI.Toggle(pages.Aimbot,"Target Bots",Config.Aimbot.TargetBots,function(v) Config.Aimbot.TargetBots=v end)
 UI.Toggle(pages.Aimbot,"Wall Check",Config.Aimbot.WallCheck,function(v) Config.Aimbot.WallCheck=v end)
-UI.Section(pages.Aimbot,"Tuning")
 UI.Slider(pages.Aimbot,"FOV",10,600,Config.Aimbot.FOV,function(v) Config.Aimbot.FOV=v end)
 UI.Slider(pages.Aimbot,"Smooth %",1,100,math.floor(Config.Aimbot.Smooth*100),function(v) Config.Aimbot.Smooth=v/100 end)
-UI.Section(pages.Aimbot,"FOV Circle")
 UI.Toggle(pages.Aimbot,"Show FOV",Config.Aimbot.ShowFOV,function(v) Config.Aimbot.ShowFOV=v end)
 UI.ColorPicker(pages.Aimbot,"FOV Color",Config.Aimbot.FOVColor,function(c) Config.Aimbot.FOVColor=c end)
 
@@ -374,16 +305,17 @@ UI.Toggle(pages.Silent,"Enabled",Config.Silent.Enabled,function(v) Config.Silent
 UI.Dropdown(pages.Silent,"Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},Config.Silent.Part,function(v) Config.Silent.Part=v end)
 UI.Toggle(pages.Silent,"Target Bots",Config.Silent.TargetBots,function(v) Config.Silent.TargetBots=v end)
 UI.Toggle(pages.Silent,"Wall Check",Config.Silent.WallCheck,function(v) Config.Silent.WallCheck=v end)
-UI.Section(pages.Silent,"Advanced")
 UI.Toggle(pages.Silent,"Hitbox Random",Config.Silent.HitboxRandom,function(v) Config.Silent.HitboxRandom=v end)
 UI.Slider(pages.Silent,"Delay (ms)",0,500,Config.Silent.Delay,function(v) Config.Silent.Delay=v end)
+UI.Slider(pages.Silent,"FOV",10,600,Config.Silent.FOV,function(v) Config.Silent.FOV=v end)
+UI.Toggle(pages.Silent,"Show FOV",Config.Silent.ShowFOV,function(v) Config.Silent.ShowFOV=v end)
+UI.ColorPicker(pages.Silent,"FOV Color",Config.Silent.FOVColor,function(c) Config.Silent.FOVColor=c end)
 
 UI.Section(pages.Trigger,"Main")
 UI.Toggle(pages.Trigger,"Enabled",Config.Trigger.Enabled,function(v) Config.Trigger.Enabled=v end)
 UI.Dropdown(pages.Trigger,"Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},Config.Trigger.Part,function(v) Config.Trigger.Part=v end)
 UI.Toggle(pages.Trigger,"Target Bots",Config.Trigger.TargetBots,function(v) Config.Trigger.TargetBots=v end)
 UI.Toggle(pages.Trigger,"Wall Check",Config.Trigger.WallCheck,function(v) Config.Trigger.WallCheck=v end)
-UI.Section(pages.Trigger,"Tuning")
 UI.Slider(pages.Trigger,"Delay (ms)",0,500,Config.Trigger.Delay,function(v) Config.Trigger.Delay=v end)
 
 UI.Section(pages.Colors,"ESP")
@@ -392,7 +324,6 @@ UI.ColorPicker(pages.Colors,"Skeleton",Config.Colors.Skeleton,function(c) Config
 UI.ColorPicker(pages.Colors,"Tracer",Config.Colors.Tracer,function(c) Config.Colors.Tracer=c end)
 UI.ColorPicker(pages.Colors,"Chams",Config.Colors.Chams,function(c) Config.Colors.Chams=c end)
 UI.ColorPicker(pages.Colors,"Bot Color",Config.Colors.Bot,function(c) Config.Colors.Bot=c end)
-UI.Section(pages.Colors,"HP / Text")
 UI.ColorPicker(pages.Colors,"HP Fill",Config.Colors.HP,function(c) Config.Colors.HP=c end)
 UI.ColorPicker(pages.Colors,"HP Background",Config.Colors.HP_Back,function(c) Config.Colors.HP_Back=c end)
 UI.ColorPicker(pages.Colors,"Name",Config.Colors.Name,function(c) Config.Colors.Name=c end)
@@ -405,27 +336,17 @@ UI.Button(pages.Settings,"Destroy Hub",function() gui:Destroy() end,Theme.Danger
 showPage("Visual")
 root.Visible = true
 fab.Visible = false
-onTap(fab, function()
-    if fabMoved then return end
-    root.Visible = true; fab.Visible = false; showPage("Visual")
-end)
+onTap(fab, function() if fabMoved then return end; root.Visible=true; fab.Visible=false; showPage("Visual") end)
 
 --============================================================
---  ESP LOGIC (30 Hz + боты раз в 0.5с)
+--  ESP LOGIC (30 Hz)
 --============================================================
-local ESP_Store = {}
-local Chams_Store = {}
-local BOT_Store = {}
-
+local ESP_Store, Chams_Store, BOT_Store = {}, {}, {}
 local function newLine(color,t) local l=Drawing.new("Line"); l.Visible=false; l.Color=color or Color3.new(1,1,1); l.Thickness=t or 1; l.Transparency=1; return l end
 local function newText(size,color)
-    local t = Drawing.new("Text")
-    t.Visible=false; t.Center=true; t.Outline=true; t.OutlineColor=Color3.new(0,0,0)
-    t.Size=size or 14; t.Color=color or Color3.new(1,1,1)
-    t.Font = (Drawing.Fonts and Drawing.Fonts.UI) or 0
-    return t
+    local t = Drawing.new("Text"); t.Visible=false; t.Center=true; t.Outline=true; t.OutlineColor=Color3.new(0,0,0)
+    t.Size=size or 14; t.Color=color or Color3.new(1,1,1); t.Font=(Drawing.Fonts and Drawing.Fonts.UI) or 0; return t
 end
-
 local R15_SKELETON = {
     {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
     {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
@@ -453,7 +374,6 @@ local function createESPObjects(store, key, isBot)
     for i=1,#R15_SKELETON do s.skeleton[i]=newLine(isBot and Config.Colors.Bot or Config.Colors.Skeleton,1) end
     store[key]=s
 end
-
 local function removeESPObjects(store, key)
     local s = store[key]; if not s then return end
     for _,l in ipairs(s.box_lines) do l:Remove() end
@@ -465,7 +385,6 @@ local function removeESPObjects(store, key)
     if s.dist then s.dist:Remove() end
     store[key]=nil
 end
-
 local function hideESP(s)
     for _,l in ipairs(s.box_lines) do l.Visible=false end
     s.tracer.Visible=false
@@ -473,7 +392,6 @@ local function hideESP(s)
     s.hp_back_line.Visible=false; s.hp_fill_line.Visible=false
     s.name.Visible=false; s.dist.Visible=false
 end
-
 local function updateESPGeneric(store, key, char, isBot)
     if not char then if store[key] then hideESP(store[key]) end; return end
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -482,212 +400,141 @@ local function updateESPGeneric(store, key, char, isBot)
     local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not (head and torso and hrp) then return end
-
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if myRoot and Config.Visual.MaxDistance and Config.Visual.MaxDistance > 0 then
-        local dist = (myRoot.Position - hrp.Position).Magnitude
-        if dist > Config.Visual.MaxDistance then
-            if store[key] then hideESP(store[key]) end
-            return
-        end
+        if (myRoot.Position-hrp.Position).Magnitude > Config.Visual.MaxDistance then if store[key] then hideESP(store[key]) end; return end
     end
-
     createESPObjects(store, key, isBot)
     local s = store[key]
     local boxColor = isBot and Config.Colors.Bot or Config.Colors.Box
     local skelColor = isBot and Config.Colors.Bot or Config.Colors.Skeleton
-
     local headScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2,0))
     local hrpScreen = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0))
     local onScreen = headScreen.Z>0 and hrpScreen.Z>0
-
     if Config.Visual.Enabled and Config.Visual.Box and onScreen and (not isBot or Config.Visual.Bots) then
-        local height = math.abs(headScreen.Y-hrpScreen.Y)
-        local width = height*0.45
-        local cx = hrpScreen.X; local cy = hrpScreen.Y
-        local x1,y1 = cx-width/2, cy-height
-        local x2,y2 = cx+width/2, cy
+        local height = math.abs(headScreen.Y-hrpScreen.Y); local width = height*0.45
+        local cx, cy = hrpScreen.X, hrpScreen.Y
+        local x1,y1 = cx-width/2, cy-height; local x2,y2 = cx+width/2, cy
         local L = s.box_lines
-        L[1].From = Vector2.new(x1,y1); L[1].To = Vector2.new(x2,y1)
-        L[2].From = Vector2.new(x2,y1); L[2].To = Vector2.new(x2,y2)
-        L[3].From = Vector2.new(x2,y2); L[3].To = Vector2.new(x1,y2)
-        L[4].From = Vector2.new(x1,y2); L[4].To = Vector2.new(x1,y1)
-        for _,l in ipairs(L) do l.Color = boxColor; l.Visible = true end
+        L[1].From=Vector2.new(x1,y1); L[1].To=Vector2.new(x2,y1)
+        L[2].From=Vector2.new(x2,y1); L[2].To=Vector2.new(x2,y2)
+        L[3].From=Vector2.new(x2,y2); L[3].To=Vector2.new(x1,y2)
+        L[4].From=Vector2.new(x1,y2); L[4].To=Vector2.new(x1,y1)
+        for _,l in ipairs(L) do l.Color=boxColor; l.Visible=true end
     else for _,l in ipairs(s.box_lines) do l.Visible=false end end
-
     if Config.Visual.Enabled and Config.Visual.Skeleton and (not isBot or Config.Visual.Bots) then
         local conns = getSkeletonConnections(char)
         for i=1,#s.skeleton do s.skeleton[i].Visible=false end
         for i,pair in ipairs(conns) do
-            local p1 = char:FindFirstChild(pair[1])
-            local p2 = char:FindFirstChild(pair[2])
+            local p1 = char:FindFirstChild(pair[1]); local p2 = char:FindFirstChild(pair[2])
             local line = s.skeleton[i]
             if p1 and p2 and line then
-                local a = Camera:WorldToViewportPoint(p1.Position)
-                local b = Camera:WorldToViewportPoint(p2.Position)
-                if a.Z>0 and b.Z>0 then
-                    line.From = Vector2.new(a.X,a.Y); line.To = Vector2.new(b.X,b.Y)
-                    line.Color = skelColor; line.Visible = true
-                end
+                local a = Camera:WorldToViewportPoint(p1.Position); local b = Camera:WorldToViewportPoint(p2.Position)
+                if a.Z>0 and b.Z>0 then line.From=Vector2.new(a.X,a.Y); line.To=Vector2.new(b.X,b.Y); line.Color=skelColor; line.Visible=true end
             end
         end
     else for _,l in pairs(s.skeleton) do l.Visible=false end end
-
     if Config.Visual.Enabled and Config.Visual.Tracer and (not isBot or Config.Visual.Bots) then
         local toPos = Camera:WorldToViewportPoint(torso.Position)
         if toPos.Z>0 then
-            s.tracer.From = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y)
-            s.tracer.To = Vector2.new(toPos.X,toPos.Y)
+            s.tracer.From = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y); s.tracer.To = Vector2.new(toPos.X,toPos.Y)
             s.tracer.Color = Config.Colors.RGB and Color3.fromHSV((tick()*0.5)%1,1,1) or (isBot and Config.Colors.Bot or Config.Colors.Tracer)
             s.tracer.Visible = true
         else s.tracer.Visible=false end
     else s.tracer.Visible=false end
-
     if Config.Visual.Enabled and Config.Visual.HP and Config.Visual.Box and onScreen and (not isBot or Config.Visual.Bots) then
-        local height = math.abs(headScreen.Y-hrpScreen.Y)
-        local width = height*0.45
-        local cx = hrpScreen.X; local topY = hrpScreen.Y-height
-        local barX = cx-width/2-6
+        local height = math.abs(headScreen.Y-hrpScreen.Y); local width = height*0.45
+        local cx = hrpScreen.X; local topY = hrpScreen.Y-height; local barX = cx-width/2-6
         local frac = math.clamp(hum.Health/hum.MaxHealth,0,1)
-        s.hp_back_line.From = Vector2.new(barX,topY); s.hp_back_line.To = Vector2.new(barX,topY+height)
-        s.hp_back_line.Color = Config.Colors.HP_Back; s.hp_back_line.Visible = true
-        s.hp_fill_line.From = Vector2.new(barX,topY+height-height*frac); s.hp_fill_line.To = Vector2.new(barX,topY+height)
-        s.hp_fill_line.Color = Config.Colors.HP; s.hp_fill_line.Visible = true
+        s.hp_back_line.From=Vector2.new(barX,topY); s.hp_back_line.To=Vector2.new(barX,topY+height); s.hp_back_line.Color=Config.Colors.HP_Back; s.hp_back_line.Visible=true
+        s.hp_fill_line.From=Vector2.new(barX,topY+height-height*frac); s.hp_fill_line.To=Vector2.new(barX,topY+height); s.hp_fill_line.Color=Config.Colors.HP; s.hp_fill_line.Visible=true
     else s.hp_back_line.Visible=false; s.hp_fill_line.Visible=false end
-
     if Config.Visual.Enabled and Config.Visual.Names and onScreen and (not isBot or Config.Visual.Bots) then
         local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
-        if top.Z>0 then
-            s.name.Text = (isBot and "[BOT] " or "")..(char.Name or "")
-            s.name.Color = isBot and Config.Colors.Bot or Config.Colors.Name
-            s.name.Position = Vector2.new(top.X,top.Y-14); s.name.Size = 14; s.name.Visible = true
-        else s.name.Visible=false end
+        if top.Z>0 then s.name.Text=(isBot and "[BOT] " or "")..(char.Name or ""); s.name.Color=isBot and Config.Colors.Bot or Config.Colors.Name; s.name.Position=Vector2.new(top.X,top.Y-14); s.name.Size=14; s.name.Visible=true else s.name.Visible=false end
     else s.name.Visible=false end
-
     if Config.Visual.Enabled and Config.Visual.Distance and onScreen and (not isBot or Config.Visual.Bots) then
         local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
-        if top.Z>0 then
-            local dist = math.floor((Camera.CFrame.Position-hrp.Position).Magnitude)
-            s.dist.Text = tostring(dist).."m"; s.dist.Color = Config.Colors.Distance
-            s.dist.Position = Vector2.new(top.X,top.Y+2); s.dist.Size = 12; s.dist.Visible = true
-        else s.dist.Visible=false end
+        if top.Z>0 then local dist=math.floor((Camera.CFrame.Position-hrp.Position).Magnitude); s.dist.Text=tostring(dist).."m"; s.dist.Color=Config.Colors.Distance; s.dist.Position=Vector2.new(top.X,top.Y+2); s.dist.Size=12; s.dist.Visible=true else s.dist.Visible=false end
     else s.dist.Visible=false end
 end
-
 local function updateChams(player,char)
-    if player==LocalPlayer or not char then
-        if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end
-        return
-    end
-    if not Config.Visual.Enabled or not Config.Visual.Chams then
-        if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end
-        return
-    end
+    if player==LocalPlayer or not char then if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end; return end
+    if not Config.Visual.Enabled or not Config.Visual.Chams then if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end; return end
     if not Chams_Store[player] then
-        local hl = Instance.new("Highlight")
-        hl.Name="ESP_Chams"; hl.FillTransparency=0.5; hl.OutlineTransparency=1
-        hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent=char
+        local hl = Instance.new("Highlight"); hl.Name="ESP_Chams"; hl.FillTransparency=0.5; hl.OutlineTransparency=1; hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent=char
         Chams_Store[player]=hl
     end
     Chams_Store[player].FillColor = Config.Colors.Chams
 end
-
 local botScanTime = 0
 local function updateBots()
-    if not Config.Visual.Enabled or not Config.Visual.Bots then
-        for obj,s in pairs(BOT_Store) do hideESP(s) end
-        return
-    end
-    if tick() - botScanTime > 0.5 then
+    if not Config.Visual.Enabled or not Config.Visual.Bots then for obj,s in pairs(BOT_Store) do hideESP(s) end; return end
+    if tick()-botScanTime > 0.5 then
         botScanTime = tick()
         local current = {}
         for _, obj in ipairs(workspace:GetChildren()) do
             if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and not Players:GetPlayerFromCharacter(obj) then
-                current[obj] = true
-                updateESPGeneric(BOT_Store, obj, obj, true)
+                current[obj]=true; updateESPGeneric(BOT_Store, obj, obj, true)
             end
         end
-        for obj,s in pairs(BOT_Store) do
-            if not current[obj] or not obj.Parent then removeESPObjects(BOT_Store, obj) end
-        end
+        for obj,s in pairs(BOT_Store) do if not current[obj] or not obj.Parent then removeESPObjects(BOT_Store, obj) end end
     end
 end
-
--- ESP 30 Hz
 task.spawn(function()
     while task.wait(0.033) do
         for _,p in ipairs(Players:GetPlayers()) do
             local char = p.Character
-            if p==LocalPlayer then
-                if ESP_Store[p] then hideESP(ESP_Store[p]) end
-            else
-                updateESPGeneric(ESP_Store, p, char, false)
-            end
+            if p==LocalPlayer then if ESP_Store[p] then hideESP(ESP_Store[p]) end else updateESPGeneric(ESP_Store, p, char, false) end
             updateChams(p,char)
         end
         pcall(updateBots)
     end
 end)
-Players.PlayerRemoving:Connect(function(p)
-    removeESPObjects(ESP_Store, p)
-    if Chams_Store[p] then Chams_Store[p]:Destroy(); Chams_Store[p]=nil end
-end)
+Players.PlayerRemoving:Connect(function(p) removeESPObjects(ESP_Store,p); if Chams_Store[p] then Chams_Store[p]:Destroy(); Chams_Store[p]=nil end end)
 
 --========== TARGET ==========
 local function isVisible(part)
     if not part then return false end
-    local origin = Camera.CFrame.Position
-    local dir = part.Position-origin
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = { LocalPlayer.Character, Camera }
-    local result = workspace:Raycast(origin,dir,params)
+    local result = workspace:Raycast(Camera.CFrame.Position, part.Position-Camera.CFrame.Position, params)
     return result==nil or result.Instance:IsDescendantOf(part.Parent)
 end
-
 local function collectTargets(cfg)
     local list = {}
     for _,p in ipairs(Players:GetPlayers()) do
         if p~=LocalPlayer and p.Character then
-            local part = p.Character:FindFirstChild(cfg.Part)
-            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            local part = p.Character:FindFirstChild(cfg.Part); local hum = p.Character:FindFirstChildOfClass("Humanoid")
             if part and hum and hum.Health>0 then table.insert(list,{part=part, hum=hum, char=p.Character}) end
         end
     end
     if cfg.TargetBots then
         for obj,s in pairs(BOT_Store) do
             if obj.Parent then
-                local part = obj:FindFirstChild(cfg.Part)
-                local hum = obj:FindFirstChildOfClass("Humanoid")
+                local part = obj:FindFirstChild(cfg.Part); local hum = obj:FindFirstChildOfClass("Humanoid")
                 if part and hum and hum.Health>0 then table.insert(list,{part=part, hum=hum, char=obj}) end
             end
         end
     end
     return list
 end
-
 local function getTarget(cfg, useFOV)
-    local center = Camera.ViewportSize / 2
-    local cands = {}
+    local center = Camera.ViewportSize/2; local cands = {}
     local fov = useFOV and cfg.FOV or math.huge
-    for _, t in ipairs(collectTargets(cfg)) do
+    for _,t in ipairs(collectTargets(cfg)) do
         local pos,onScreen = Camera:WorldToViewportPoint(t.part.Position)
         if onScreen then
             local dist = (Vector2.new(pos.X,pos.Y)-center).Magnitude
             if dist<=fov then
-                if not cfg.WallCheck or isVisible(t.part) then
-                    table.insert(cands,{part=t.part,fovDist=dist,worldDist=(Camera.CFrame.Position-t.part.Position).Magnitude,health=t.hum.Health})
-                end
+                if not cfg.WallCheck or isVisible(t.part) then table.insert(cands,{part=t.part,fovDist=dist,worldDist=(Camera.CFrame.Position-t.part.Position).Magnitude,health=t.hum.Health}) end
             end
         end
     end
     if #cands==0 then return nil end
-    table.sort(cands,function(a,b)
-        if cfg.Priority=="FOV" then return a.fovDist<b.fovDist
-        elseif cfg.Priority=="Health" then return a.health<b.health
-        else return a.worldDist<b.worldDist end
-    end)
+    table.sort(cands,function(a,b) if cfg.Priority=="FOV" then return a.fovDist<b.fovDist elseif cfg.Priority=="Health" then return a.health<b.health else return a.worldDist<b.worldDist end end)
     return cands[1].part
 end
 
@@ -695,13 +542,11 @@ end
 local FOV_Aimbot, FOV_Silent
 local function updateCircle(circle,cfg,center)
     if not circle then circle = Drawing.new("Circle") end
-    circle.Visible = true; circle.Position = center; circle.Radius = cfg.FOV
-    circle.Color = cfg.FOVColor; circle.Thickness = cfg.FOVThickness or 1
-    circle.Transparency = cfg.FOVTransparency or 0.6; circle.Filled = cfg.FOVFilled or false
+    circle.Visible=true; circle.Position=center; circle.Radius=cfg.FOV; circle.Color=cfg.FOVColor; circle.Thickness=cfg.FOVThickness or 1; circle.Transparency=cfg.FOVTransparency or 0.6; circle.Filled=cfg.FOVFilled or false
     return circle
 end
 RunService.RenderStepped:Connect(function()
-    local center = Camera.ViewportSize / 2
+    local center = Camera.ViewportSize/2
     if Config.Aimbot.ShowFOV and Config.Aimbot.Enabled then FOV_Aimbot = updateCircle(FOV_Aimbot,Config.Aimbot,center) elseif FOV_Aimbot then FOV_Aimbot.Visible=false end
     if Config.Silent.ShowFOV and Config.Silent.Enabled then FOV_Silent = updateCircle(FOV_Silent,Config.Silent,center) elseif FOV_Silent then FOV_Silent.Visible=false end
 end)
@@ -709,17 +554,13 @@ end)
 --========== AIMBOT ==========
 RunService.RenderStepped:Connect(function()
     if not Config.Aimbot.Enabled then return end
-    local target = getTarget(Config.Aimbot, true); if not target then return end
+    local target = getTarget(Config.Aimbot,true); if not target then return end
     if Config.Aimbot.Mode=="Camera" then
-        local cur = Camera.CFrame
-        local goal = CFrame.lookAt(cur.Position,target.Position)
+        local cur = Camera.CFrame; local goal = CFrame.lookAt(cur.Position,target.Position)
         Camera.CFrame = cur:Lerp(goal,Config.Aimbot.Smooth)
     else
         local pos,onScreen = Camera:WorldToViewportPoint(target.Position)
-        if onScreen and mousemoverel then
-            local c = Camera.ViewportSize/2
-            mousemoverel((pos.X-c.X)*Config.Aimbot.Smooth,(pos.Y-c.Y)*Config.Aimbot.Smooth)
-        end
+        if onScreen and mousemoverel then local c=Camera.ViewportSize/2; mousemoverel((pos.X-c.X)*Config.Aimbot.Smooth,(pos.Y-c.Y)*Config.Aimbot.Smooth) end
     end
 end)
 
@@ -732,28 +573,16 @@ end
 local lastSilent = 0
 local oldNamecall
 oldNamecall = hookmetamethod(game,"__namecall",function(self,...)
-    local method = getnamecallmethod()
-    local args = {...}
+    local method = getnamecallmethod(); local args = {...}
     if not checkcaller() and Config.Silent.Enabled then
         if method=="Raycast" and self==workspace then
             if tick()-lastSilent >= Config.Silent.Delay/1000 then
-                local target = getTarget(Config.Silent, true)
-                if target then
-                    lastSilent = tick()
-                    local origin = args[1]; local dir = args[2]
-                    args[2] = (randomizeHit(target)-origin).Unit*dir.Magnitude
-                    return oldNamecall(self,unpack(args))
-                end
+                local target = getTarget(Config.Silent,true)
+                if target then lastSilent=tick(); local origin=args[1]; local dir=args[2]; args[2]=(randomizeHit(target)-origin).Unit*dir.Magnitude; return oldNamecall(self,unpack(args)) end
             end
         elseif method=="FindPartOnRay" or method=="FindPartOnRayWithIgnoreList" then
-            local target = getTarget(Config.Silent, true)
-            if target then
-                local ray = args[1]
-                if typeof(ray)=="Ray" then
-                    args[1] = Ray.new(ray.Origin,(randomizeHit(target)-ray.Origin).Unit*ray.Direction.Magnitude)
-                    return oldNamecall(self,unpack(args))
-                end
-            end
+            local target = getTarget(Config.Silent,true)
+            if target then local ray=args[1]; if typeof(ray)=="Ray" then args[1]=Ray.new(ray.Origin,(randomizeHit(target)-ray.Origin).Unit*ray.Direction.Magnitude); return oldNamecall(self,unpack(args)) end end
         end
     end
     return oldNamecall(self,...)
@@ -762,24 +591,46 @@ local oldIndex
 oldIndex = hookmetamethod(game,"__index",function(self,key)
     if not checkcaller() and Config.Silent.Enabled then
         if self==Mouse and (key=="Hit" or key=="Target") then
-            local target = getTarget(Config.Silent, true)
+            local target = getTarget(Config.Silent,true)
             if target then return key=="Hit" and CFrame.new(randomizeHit(target)) or target end
         end
     end
     return oldIndex(self,key)
 end)
 
---========== TRIGGER ==========
+--========== TRIGGER (Raycast + временный Silent Aim) ==========
+local function isTargetUnderCrosshair()
+    local origin = Camera.CFrame.Position
+    local direction = Camera.CFrame.LookVector * 500
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { LocalPlayer.Character, Camera }
+    local result = workspace:Raycast(origin, direction, params)
+    if result and result.Instance then
+        local model = result.Instance:FindFirstAncestorOfClass("Model")
+        if model then
+            local hum = model:FindFirstChildOfClass("Humanoid")
+            if hum and hum.Health > 0 then
+                local plr = Players:GetPlayerFromCharacter(model)
+                if plr and plr ~= LocalPlayer then return true end
+                if not plr and Config.Trigger.TargetBots then return true end
+            end
+        end
+    end
+    return false
+end
+
 local lastTrigger = 0
 RunService.RenderStepped:Connect(function()
     if not Config.Trigger.Enabled then return end
     if tick()-lastTrigger < Config.Trigger.Delay/1000 then return end
-    local target = getTarget(Config.Trigger, false)
-    if target then
+    if isTargetUnderCrosshair() then
         lastTrigger = tick()
-        if mouse1click then mouse1click()
-        elseif mouse1press and mouse1release then mouse1press(); task.wait(0.02); mouse1release() end
+        if not Config.Silent.Enabled then
+            Config.Silent.Enabled = true
+            task.delay(0.05, function() Config.Silent.Enabled = false end)
+        end
     end
 end)
 
-print("[RGB HUB v11 OPTIMIZED] Loaded. RGB 15Hz, ESP 30Hz, bots 0.5s.")
+print("[RGB HUB v12] Loaded. Trigger safe (Raycast + temp Silent).")
