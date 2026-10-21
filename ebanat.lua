@@ -1,12 +1,13 @@
 --============================================================
---  RGB HUB MOBILE — v12 (TRIGGER SAFE)
---  Trigger через Raycast + временный Silent Aim (без mouse1click)
+--  RGB HUB MOBILE — v13 (FINAL)
+--  Сохранение настроек, Trigger safe, RGB, MaxDistance
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local HttpService = game:GetService("HttpService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
@@ -27,6 +28,58 @@ local Config = {
     Trigger = { Enabled=false, Part="Head", WallCheck=true, Delay=80, TargetBots=true },
     Settings = { FABX=20, FABY=120, RGBMenu=true },
 }
+
+--========== CONFIG SAVE/LOAD ==========
+local CONFIG_PATH = "RGB_Hub_Config.json"
+
+local function encodeConfig()
+    local data = {}
+    for k, v in pairs(Config) do
+        if type(v) == "table" then
+            data[k] = {}
+            for k2, v2 in pairs(v) do
+                if type(v2) == "Color3" then
+                    data[k][k2] = {__color = true, R = v2.R, G = v2.G, B = v2.B}
+                elseif type(v2) == "boolean" or type(v2) == "number" or type(v2) == "string" then
+                    data[k][k2] = v2
+                end
+            end
+        end
+    end
+    return data
+end
+
+local function decodeConfig(data)
+    for k, v in pairs(data) do
+        if type(v) == "table" and Config[k] then
+            for k2, v2 in pairs(v) do
+                if type(v2) == "table" and v2.__color then
+                    Config[k][k2] = Color3.new(v2.R, v2.G, v2.B)
+                else
+                    Config[k][k2] = v2
+                end
+            end
+        end
+    end
+end
+
+local function saveConfig()
+    if not writefile then return end
+    pcall(function()
+        writefile(CONFIG_PATH, HttpService:JSONEncode(encodeConfig()))
+    end)
+end
+
+local function loadConfig()
+    if not (isfile and readfile) then return end
+    if not isfile(CONFIG_PATH) then return end
+    pcall(function()
+        local raw = readfile(CONFIG_PATH)
+        decodeConfig(HttpService:JSONDecode(raw))
+    end)
+end
+
+loadConfig()
 
 --========== THEME ==========
 local Theme = {
@@ -74,7 +127,7 @@ corner(fab,FAB_SIZE/2); addRGB(fab,"BackgroundColor3",0)
 local fabDragging, fabStart, fabStartPos, fabMoved
 fab.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then fabDragging=true; fabMoved=false; fabStart=input.Position; fabStartPos=fab.Position end end)
 UIS.InputChanged:Connect(function(input) if fabDragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then local d=input.Position-fabStart; if math.abs(d.X)>4 or math.abs(d.Y)>4 then fabMoved=true end; fab.Position=UDim2.new(fabStartPos.X.Scale,fabStartPos.X.Offset+d.X,fabStartPos.Y.Scale,fabStartPos.Y.Offset+d.Y) end end)
-UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then if fabDragging then Config.Settings.FABX=fab.Position.X.Offset; Config.Settings.FABY=fab.Position.Y.Offset end; fabDragging=false end end)
+UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then if fabDragging then Config.Settings.FABX=fab.Position.X.Offset; Config.Settings.FABY=fab.Position.Y.Offset; saveConfig() end; fabDragging=false end end)
 
 -- MENU
 local root = new("Frame",{Name="Menu",Size=UDim2.new(0,MENU_W,0,MENU_H),Position=UDim2.new(0.5,-MENU_W/2,0.5,-MENU_H/2),BackgroundColor3=Color3.fromRGB(18,18,24),BorderSizePixel=0,Visible=false,ZIndex=25,ClipsDescendants=false},gui)
@@ -84,11 +137,11 @@ addRGB(topGlow,"BackgroundColor3",0.05)
 local HEADER_H=44
 local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
-local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v12",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
+local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v13",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
 addRGB(titleLbl,"TextColor3",0.1)
 local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,-40,0.5,-15),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
 corner(closeBtn,15); addRGB(closeBtn,"BackgroundColor3",0.2)
-onTap(closeBtn, function() root.Visible=false; fab.Visible=true end)
+onTap(closeBtn, function() saveConfig(); root.Visible=false; fab.Visible=true end)
 
 local sidebar = new("Frame",{Size=UDim2.new(0,SIDEBAR_W,1,-HEADER_H),Position=UDim2.new(0,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 padding(sidebar,8)
@@ -156,7 +209,7 @@ function UI.Section(page,text)
     local wrap = new("Frame",{Size=UDim2.new(1,0,0,24),BackgroundTransparency=1,ZIndex=27},inner)
     local bar = new("Frame",{Size=UDim2.new(0,3,0,12),Position=UDim2.new(0,4,0.5,-6),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},wrap)
     corner(bar,2)
-    local lbl = new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},wrap)
+    new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},wrap)
     return wrap
 end
 local function card(parent,h)
@@ -181,6 +234,7 @@ function UI.Toggle(page,label,default,callback)
         else tween(track,0.22,{BackgroundColor3=Theme.Panel2}):Play(); for i=#RGB.elements,1,-1 do if RGB.elements[i]==rgbEntry then table.remove(RGB.elements,i) end end end
         tween(knob,0.22,{Position=state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)}):Play()
         if callback then callback(state) end
+        saveConfig()
     end)
     return c
 end
@@ -200,7 +254,7 @@ function UI.Slider(page,label,min,max,default,callback)
     local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); value=math.floor(min+(max-min)*rel+0.5); fill.Size=UDim2.new(rel,0,1,0); thumb.Position=UDim2.new(rel,-6,0.5,-6); val.Text=tostring(value); if callback then callback(value) end end
     hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; upd(input.Position.X) end end)
     UIS.InputChanged:Connect(function(input) if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
-    UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+    UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false; saveConfig() end end)
     return c
 end
 function UI.Button(page,label,callback,color)
@@ -229,6 +283,7 @@ function UI.Dropdown(page,label,options,default,callback)
             expanded=false; list.Visible=false
             tween(list,0.15,{Size=UDim2.new(1,-16,0,0)}):Play()
             tween(c,0.15,{Size=UDim2.new(1,0,0,42)}):Play()
+            saveConfig()
         end)
     end
     onTap(openHit, function()
@@ -249,7 +304,7 @@ function UI.ColorPicker(page,label,default,callback)
     local picker = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=80},c)
     corner(picker,10); padding(picker,8)
     local h,s,v=(default or Color3.new(1,1,1)):ToHSV()
-    local function apply() local col=Color3.fromHSV(h,s,v); sw.BackgroundColor3=col; if callback then callback(col) end end
+    local function apply() local col=Color3.fromHSV(h,s,v); sw.BackgroundColor3=col; if callback then callback(col) end; saveConfig() end
     local function hsvSlider(name,idx,def,cb)
         local f = new("Frame",{Size=UDim2.new(1,0,0,24),Position=UDim2.new(0,0,0,idx*26),BackgroundTransparency=1,ZIndex=81},picker)
         new("TextLabel",{Size=UDim2.new(0,30,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=10,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=81},f)
@@ -262,7 +317,7 @@ function UI.ColorPicker(page,label,default,callback)
         local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); fill.Size=UDim2.new(rel,0,1,0); cb(rel) end
         hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=true; upd(input.Position.X) end end)
         UIS.InputChanged:Connect(function(input) if drag and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
-        UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
+        UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=false; saveConfig() end end)
     end
     hsvSlider("H",0,h,function(r) h=r; apply() end)
     hsvSlider("S",1,s,function(r) s=r; apply() end)
@@ -331,7 +386,9 @@ UI.ColorPicker(pages.Colors,"Distance",Config.Colors.Distance,function(c) Config
 
 UI.Section(pages.Settings,"Menu")
 UI.Toggle(pages.Settings,"RGB Menu",Config.Settings.RGBMenu,function(v) RGB.enabled=v end)
-UI.Button(pages.Settings,"Destroy Hub",function() gui:Destroy() end,Theme.Danger)
+UI.Button(pages.Settings,"Save Config",function() saveConfig() end)
+UI.Button(pages.Settings,"Load Config",function() loadConfig(); showPage("Visual") end)
+UI.Button(pages.Settings,"Destroy Hub",function() saveConfig(); gui:Destroy() end,Theme.Danger)
 
 showPage("Visual")
 root.Visible = true
@@ -356,7 +413,6 @@ local R15_SKELETON = {
 }
 local R6_SKELETON = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
 local function getSkeletonConnections(char) if char:FindFirstChild("UpperTorso") then return R15_SKELETON else return R6_SKELETON end end
-
 local function createESPObjects(store, key, isBot)
     if store[key] then return end
     local color = isBot and Config.Colors.Bot or Config.Colors.Box
@@ -598,14 +654,12 @@ oldIndex = hookmetamethod(game,"__index",function(self,key)
     return oldIndex(self,key)
 end)
 
---========== TRIGGER (Raycast + временный Silent Aim) ==========
+--========== TRIGGER (Raycast + temp Silent) ==========
 local function isTargetUnderCrosshair()
-    local origin = Camera.CFrame.Position
-    local direction = Camera.CFrame.LookVector * 500
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = { LocalPlayer.Character, Camera }
-    local result = workspace:Raycast(origin, direction, params)
+    local result = workspace:Raycast(Camera.CFrame.Position, Camera.CFrame.LookVector*500, params)
     if result and result.Instance then
         local model = result.Instance:FindFirstAncestorOfClass("Model")
         if model then
@@ -619,7 +673,6 @@ local function isTargetUnderCrosshair()
     end
     return false
 end
-
 local lastTrigger = 0
 RunService.RenderStepped:Connect(function()
     if not Config.Trigger.Enabled then return end
@@ -633,4 +686,5 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[RGB HUB v12] Loaded. Trigger safe (Raycast + temp Silent).")
+game:BindToClose(function() pcall(saveConfig) end)
+print("[RGB HUB v13] Loaded. Config saved to "..CONFIG_PATH)
