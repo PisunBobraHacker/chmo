@@ -1,8 +1,7 @@
 --============================================================
---  RGB HUB MOBILE — v9 (TOUCH-FIRST)
---  Вся логика нажатий и скролла переписана под тач
---  Никаких MouseButton1Click/Down — только InputBegan/Changed/Ended
---  Кастомный скролл без ScrollingFrame
+--  RGB HUB MOBILE — v10 (SCROLL SLIDER PER TAB)
+--  onTap на InputBegan (примитив, работает на Delta)
+--  Свой слайдер прокрутки для каждой вкладки
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -57,39 +56,11 @@ local function stroke(p,c,t,tr) return new("UIStroke",{Color=c or Theme.Stroke,T
 local function padding(p,a) return new("UIPadding",{PaddingTop=UDim.new(0,a),PaddingBottom=UDim.new(0,a),PaddingLeft=UDim.new(0,a),PaddingRight=UDim.new(0,a)},p) end
 local function tween(o,t,p,s,d) return TweenService:Create(o,TweenInfo.new(t,s or Enum.EasingStyle.Quint,d or Enum.EasingDirection.Out),p) end
 
---========== TOUCH CLICK (главный фикс) ==========
--- Универсальный обработчик тапа: срабатывает на InputEnded, если палец
--- не сдвинулся больше чем на 10 пикселей от точки нажатия.
+--========== ПРИМИТИВНЫЙ ТАП ==========
 local function onTap(guiObject, callback)
-    local startPos, startTime, moved
     guiObject.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            startPos = input.Position
-            startTime = tick()
-            moved = false
-        end
-    end)
-    UIS.InputChanged:Connect(function(input)
-        if startPos and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            if (input.Position - startPos).Magnitude > 10 then
-                moved = true
-            end
-        end
-    end)
-    UIS.InputEnded:Connect(function(input)
-        if not startPos then return end
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not moved and (tick() - startTime) < 0.5 then
-                -- проверяем, что палец отпущен над объектом
-                local absPos = guiObject.AbsolutePosition
-                local absSize = guiObject.AbsoluteSize
-                local p = input.Position
-                if p.X >= absPos.X and p.X <= absPos.X + absSize.X and
-                   p.Y >= absPos.Y and p.Y <= absPos.Y + absSize.Y then
-                    callback()
-                end
-            end
-            startPos = nil
+            callback()
         end
     end)
 end
@@ -143,7 +114,7 @@ addRGB(topGlow,"BackgroundColor3",0.05)
 local HEADER_H = 44
 local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
-local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB (TOUCH) v9",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
+local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v10",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
 addRGB(titleLbl,"TextColor3",0.1)
 
 local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,-40,0.5,-15),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
@@ -156,15 +127,13 @@ new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},
 
 local content = new("Frame",{Size=UDim2.new(1,-(SIDEBAR_W+10),1,-(HEADER_H+10)),Position=UDim2.new(0,SIDEBAR_W,0,HEADER_H),BackgroundTransparency=1,ZIndex=26,ClipsDescendants=true},root)
 
--- Кастомный скролл-контейнер (без ScrollingFrame)
-local pages = {}
-local tabButtons = {}
+local pages, tabButtons = {}, {}
 local tabsList = {
     {Name="Visual",Icon="◉"},{Name="Aimbot",Icon="✜"},{Name="Silent",Icon="◈"},
     {Name="Trigger",Icon="✹"},{Name="Colors",Icon="◐"},{Name="Settings",Icon="⚙"},
 }
 
--- Страница = Frame с UIListLayout + кастомный скролл
+--========== СТРАНИЦА СО СЛАЙДЕРОМ ПРОКРУТКИ ==========
 local function createPage(name)
     local page = new("Frame",{
         Name=name, Size=UDim2.fromScale(1,1),
@@ -177,28 +146,61 @@ local function createPage(name)
         Position=UDim2.new(0,0,0,0), ZIndex=27
     }, page)
     local layout = new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},inner)
-    -- Авто-высота inner по содержимому
-    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        inner.Size = UDim2.new(1,0,0,layout.AbsoluteContentSize.Y + 12)
-    end)
-    -- Кастомный тач-скролл
-    local scrollStart, scrollStartPos, scrolling
-    page.InputBegan:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.Touch then
-            scrolling=true; scrollStart=input.Position; scrollStartPos=inner.Position
+
+    -- Полоса прокрутки справа
+    local scrollBar = new("Frame",{
+        Size=UDim2.new(0,4,1,-8), Position=UDim2.new(1,-8,0,4),
+        BackgroundColor3=Theme.Panel2, BorderSizePixel=0, ZIndex=40
+    }, page)
+    corner(scrollBar,2)
+
+    local scrollThumb = new("Frame",{
+        Size=UDim2.new(1,0,0,40), Position=UDim2.new(0,0,0,0),
+        BackgroundColor3=Theme.Accent, BorderSizePixel=0, ZIndex=41
+    }, scrollBar)
+    corner(scrollThumb,2)
+    addRGB(scrollThumb,"BackgroundColor3",math.random()*0.3)
+
+    local scrollValue = 0
+    local maxScroll = 0
+
+    local function updateScroll()
+        local contentH = layout.AbsoluteContentSize.Y + 12
+        inner.Size = UDim2.new(1,0,0,contentH)
+        maxScroll = math.max(0, contentH - page.AbsoluteSize.Y)
+        local thumbH = math.clamp(page.AbsoluteSize.Y / math.max(contentH,1), 0.08, 1) * page.AbsoluteSize.Y
+        scrollThumb.Size = UDim2.new(1,0,0,thumbH)
+        local thumbY = scrollValue * (page.AbsoluteSize.Y - thumbH)
+        scrollThumb.Position = UDim2.new(0,0,0,thumbY)
+        inner.Position = UDim2.new(0,0,0,-scrollValue * maxScroll)
+    end
+
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateScroll)
+    page:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateScroll)
+
+    -- Тап по полосе
+    scrollBar.InputBegan:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
+            local relY = math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1)
+            scrollValue = relY; updateScroll()
         end
     end)
+
+    -- Драг ползунка
+    local dragging = false
+    scrollThumb.InputBegan:Connect(function(input)
+        if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end
+    end)
     UIS.InputChanged:Connect(function(input)
-        if scrolling and input.UserInputType==Enum.UserInputType.Touch then
-            local d = input.Position - scrollStart
-            local maxScroll = math.max(0, layout.AbsoluteContentSize.Y - page.AbsoluteSize.Y + 12)
-            local newY = math.clamp(scrollStartPos.Y.Offset + d.Y, -maxScroll, 0)
-            inner.Position = UDim2.new(0,0,0,newY)
+        if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then
+            local relY = math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1)
+            scrollValue = relY; updateScroll()
         end
     end)
     UIS.InputEnded:Connect(function(input)
-        if input.UserInputType==Enum.UserInputType.Touch then scrolling=false end
+        if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
     end)
+
     return page, inner, layout
 end
 
@@ -221,7 +223,7 @@ for i,t in ipairs(tabsList) do
     onTap(btn, function() showPage(t.Name) end)
 end
 
---========== UI COMPONENTS (все на onTap) ==========
+--========== UI COMPONENTS ==========
 local UI = {}
 local function getPageInner(page) return page:FindFirstChild("Inner") or page end
 
@@ -284,9 +286,9 @@ function UI.Slider(page,label,min,max,default,callback)
         fill.Size = UDim2.new(rel,0,1,0); thumb.Position = UDim2.new(rel,-6,0.5,-6); val.Text = tostring(value)
         if callback then callback(value) end
     end
-    hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch then dragging=true; upd(input.Position.X) end end)
-    UIS.InputChanged:Connect(function(input) if dragging and input.UserInputType==Enum.UserInputType.Touch then upd(input.Position.X) end end)
-    UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch then dragging=false end end)
+    hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; upd(input.Position.X) end end)
+    UIS.InputChanged:Connect(function(input) if dragging and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
+    UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
     return c
 end
 function UI.Button(page,label,callback,color)
@@ -350,9 +352,9 @@ function UI.ColorPicker(page,label,default,callback)
         local hit = new("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,-6,0),BackgroundTransparency=1,Text="",ZIndex=85},f)
         local drag = false
         local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); fill.Size=UDim2.new(rel,0,1,0); cb(rel) end
-        hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch then drag=true; upd(input.Position.X) end end)
-        UIS.InputChanged:Connect(function(input) if drag and input.UserInputType==Enum.UserInputType.Touch then upd(input.Position.X) end end)
-        UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch then drag=false end end)
+        hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=true; upd(input.Position.X) end end)
+        UIS.InputChanged:Connect(function(input) if drag and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
+        UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
     end
     hsvSlider("H",0,h,function(r) h=r; apply() end)
     hsvSlider("S",1,s,function(r) s=r; apply() end)
@@ -435,7 +437,7 @@ onTap(fab, function()
 end)
 
 --============================================================
---  ESP LOGIC
+--  ESP LOGIC (без изменений)
 --============================================================
 local ESP_Store = {}
 local Chams_Store = {}
@@ -507,7 +509,6 @@ local function updateESPGeneric(store, key, char, isBot)
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not (head and torso and hrp) then return end
 
-    -- ОГРАНИЧЕНИЕ ДИСТАНЦИИ
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if myRoot and Config.Visual.MaxDistance and Config.Visual.MaxDistance > 0 then
@@ -800,4 +801,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[RGB HUB v9 TOUCH] Loaded. Custom scroll, onTap, max distance.")
+print("[RGB HUB v10] Loaded. Scroll slider per tab, MaxDistance, onTap.")
