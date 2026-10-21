@@ -1,7 +1,7 @@
 --============================================================
---  ESP HUB MOBILE — DELTA FINAL ADAPTIVE
---  Меню по центру, горизонтальное, адаптивное под экран
---  При запуске меню открыто, крестик -> FAB, тап по FAB -> меню
+--  ESP HUB MOBILE — DELTA FINAL v5
+--  Меню по центру, горизонтальное, адаптивное
+--  Боты в ESP, FOV от центра, рабочий колорпикер
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -14,12 +14,13 @@ local Mouse = LocalPlayer:GetMouse()
 
 --========== CONFIG ==========
 local Config = {
-    Visual = { Enabled=false, Box=true, Skeleton=true, Tracer=true, Chams=true, Names=true, HP=true, Distance=true },
+    Visual = { Enabled=false, Box=true, Skeleton=true, Tracer=true, Chams=true, Names=true, HP=true, Distance=true, Bots=true },
     Colors = {
         Box=Color3.fromRGB(255,255,255), Skeleton=Color3.fromRGB(255,255,255),
         Tracer=Color3.fromRGB(255,60,60), Chams=Color3.fromRGB(120,0,255),
         HP=Color3.fromRGB(90,220,140), HP_Back=Color3.fromRGB(30,30,40),
         Name=Color3.fromRGB(255,255,255), Distance=Color3.fromRGB(200,200,210),
+        Bot=Color3.fromRGB(255,165,0),
         RGB=false,
     },
     Aimbot = { Enabled=false, FOV=120, Smooth=0.35, Part="Head", Mode="Camera", Key=nil, VisibleCheck=false, Priority="Distance", ShowFOV=true, FOVColor=Color3.fromRGB(255,255,255), FOVThickness=1, FOVTransparency=0.6, FOVFilled=false },
@@ -67,11 +68,11 @@ end
 if CoreGui:FindFirstChild("Delta_ESP_Hub") then CoreGui.Delta_ESP_Hub:Destroy() end
 local gui = new("ScreenGui",{Name="Delta_ESP_Hub",ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},CoreGui)
 
---========== АДАПТИВНЫЕ РАЗМЕРЫ ==========
+--========== АДАПТИВ ==========
 local function getMenuSize()
     local vp = Camera.ViewportSize
     local w = math.clamp(vp.X * 0.92, 320, 640)
-    local h = math.clamp(vp.Y * 0.75, 260, 420)
+    local h = math.clamp(vp.Y * 0.78, 260, 440)
     return w, h
 end
 local MENU_W, MENU_H = getMenuSize()
@@ -111,19 +112,18 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
---========== MENU (по центру, горизонтальное, адаптивное) ==========
+--========== MENU ==========
 local root = new("Frame",{
     Name="Menu",
     Size=UDim2.new(0, MENU_W, 0, MENU_H),
     Position=UDim2.new(0.5, -MENU_W/2, 0.5, -MENU_H/2),
     BackgroundColor3=Color3.fromRGB(18,18,24), BorderSizePixel=0, Visible=false,
-    ZIndex=25, ClipsDescendants=true
+    ZIndex=25, ClipsDescendants=false
 },gui)
 corner(root,14); stroke(root,Theme.Stroke,1)
 
 local topGlow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=26},root)
 
--- Header
 local HEADER_H = 44
 local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
@@ -132,7 +132,6 @@ local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(
 corner(closeBtn,15)
 closeBtn.MouseButton1Click:Connect(function() root.Visible=false; fab.Visible=true end)
 
--- Левая панель вкладок
 local sidebar = new("Frame",{
     Size=UDim2.new(0, SIDEBAR_W, 1, -HEADER_H),
     Position=UDim2.new(0,0,0,HEADER_H),
@@ -141,11 +140,10 @@ local sidebar = new("Frame",{
 padding(sidebar,8)
 new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
 
--- Правая панель контента
 local content = new("Frame",{
     Size=UDim2.new(1, -(SIDEBAR_W+10), 1, -(HEADER_H+10)),
     Position=UDim2.new(0, SIDEBAR_W, 0, HEADER_H),
-    BackgroundTransparency=1,ZIndex=26,ClipsDescendants=true
+    BackgroundTransparency=1,ZIndex=26,ClipsDescendants=false
 },root)
 
 local pages, tabButtons = {}, {}
@@ -171,20 +169,17 @@ for i,t in ipairs(tabsList) do
         Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.TextDim,
         TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=27
     },sidebar)
-    corner(btn,8)
-    padding(btn,8)
+    corner(btn,8); padding(btn,8)
     tabButtons[t.Name]=btn
-
     local page = new("ScrollingFrame",{
         Name=t.Name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,
         ScrollBarThickness=2,ScrollBarImageColor3=Theme.Accent,
-        CanvasSize=UDim2.new(0,0,0,2000),
+        CanvasSize=UDim2.new(0,0,0,3000),
         Visible=false,ZIndex=27,ScrollBarImageTransparency=0.4
     },content)
     padding(page,6)
     new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},page)
     pages[t.Name]=page
-
     btn.MouseButton1Click:Connect(function() showPage(t.Name) end)
 end
 
@@ -253,27 +248,28 @@ function UI.Dropdown(page,label,options,default,callback)
     local valLbl = new("TextLabel",{Size=UDim2.new(0,80,1,0),Position=UDim2.new(1,-96,0,0),BackgroundTransparency=1,Text=current,Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
     new("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(1,-14,0,0),BackgroundTransparency=1,Text="▾",Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.TextDim,ZIndex=28},c)
     local expanded = false
-    local list = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=29},c)
+    local list = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=60},c)
     corner(list,10); padding(list,6)
     new("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder},list)
     for _,opt in ipairs(options) do
-        local ob = new("TextButton",{Size=UDim2.new(1,0,0,28),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=30},list)
+        local ob = new("TextButton",{Size=UDim2.new(1,0,0,28),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=61},list)
         corner(ob,8)
         ob.MouseButton1Click:Connect(function()
             current = opt; valLbl.Text = opt
             if callback then callback(opt) end
             expanded = false
-            tween(list,0.2,{Size=UDim2.new(1,-16,0,0)}):Play()
-            tween(c,0.2,{Size=UDim2.new(1,0,0,42)}):Play()
-            task.wait(0.2); list.Visible=false
+            list.Visible = false
+            tween(list,0.15,{Size=UDim2.new(1,-16,0,0)}):Play()
+            tween(c,0.15,{Size=UDim2.new(1,0,0,42)}):Play()
         end)
     end
-    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=31},c)
+    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=62},c)
     hit.MouseButton1Click:Connect(function()
-        expanded = not expanded; list.Visible = expanded
+        expanded = not expanded
+        list.Visible = expanded
         local h = math.min(#options*32+12, 180)
-        tween(list,0.22,{Size=UDim2.new(1,-16,0,expanded and h or 0)}):Play()
-        tween(c,0.22,{Size=UDim2.new(1,0,0,expanded and (42+h+6) or 42)}):Play()
+        tween(list,0.2,{Size=UDim2.new(1,-16,0,expanded and h or 0)}):Play()
+        tween(c,0.2,{Size=UDim2.new(1,0,0,expanded and (42+h+6) or 42)}):Play()
     end)
     return c
 end
@@ -282,33 +278,51 @@ function UI.ColorPicker(page,label,default,callback)
     new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local sw = new("Frame",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,ZIndex=28},c)
     corner(sw,6); stroke(sw,Theme.Stroke,1)
+
     local expanded = false
-    local picker = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=29},c)
+    local picker = new("Frame",{
+        Size=UDim2.new(1,-16,0,0), Position=UDim2.new(0,8,0,46),
+        BackgroundColor3=Theme.Bg2, BorderSizePixel=0, Visible=false,
+        ClipsDescendants=true, ZIndex=70
+    },c)
     corner(picker,10); padding(picker,8)
+
     local h,s,v = (default or Color3.new(1,1,1)):ToHSV()
-    local function apply() local col=Color3.fromHSV(h,s,v); sw.BackgroundColor3=col; if callback then callback(col) end end
+    local function apply()
+        local col = Color3.fromHSV(h,s,v)
+        sw.BackgroundColor3 = col
+        if callback then callback(col) end
+    end
+
     local function hsvSlider(name,idx,def,cb)
-        local f = new("Frame",{Size=UDim2.new(1,0,0,24),Position=UDim2.new(0,0,0,idx*26),BackgroundTransparency=1,ZIndex=30},picker)
-        new("TextLabel",{Size=UDim2.new(0,30,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=10,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=30},f)
-        local bar = new("Frame",{Size=UDim2.new(1,-36,0,5),Position=UDim2.new(0,34,0.5,-2.5),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=30},f)
+        local f = new("Frame",{Size=UDim2.new(1,0,0,24),Position=UDim2.new(0,0,0,idx*26),BackgroundTransparency=1,ZIndex=71},picker)
+        new("TextLabel",{Size=UDim2.new(0,30,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=10,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=71},f)
+        local bar = new("Frame",{Size=UDim2.new(1,-36,0,5),Position=UDim2.new(0,34,0.5,-2.5),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=71},f)
         corner(bar,3)
-        local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=30},bar)
+        local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=71},bar)
         corner(fill,3)
-        local hit = new("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,-6,0),BackgroundTransparency=1,Text="",ZIndex=31},f)
+        local hit = new("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,-6,0),BackgroundTransparency=1,Text="",ZIndex=72},f)
         local drag = false
-        local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); fill.Size=UDim2.new(rel,0,1,0); cb(rel) end
+        local function upd(x)
+            local rel = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+            fill.Size = UDim2.new(rel,0,1,0)
+            cb(rel)
+        end
         hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=true; upd(input.Position.X) end end)
         UIS.InputChanged:Connect(function(input) if drag and (input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseMovement) then upd(input.Position.X) end end)
         UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
     end
+
     hsvSlider("H",0,h,function(r) h=r; apply() end)
     hsvSlider("S",1,s,function(r) s=r; apply() end)
     hsvSlider("V",2,v,function(r) v=r; apply() end)
-    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=31},c)
+
+    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=73},c)
     hit.MouseButton1Click:Connect(function()
-        expanded = not expanded; picker.Visible = expanded
-        tween(picker,0.25,{Size=UDim2.new(1,-16,0,expanded and 84 or 0)}):Play()
-        tween(c,0.25,{Size=UDim2.new(1,0,0,expanded and 132 or 42)}):Play()
+        expanded = not expanded
+        picker.Visible = expanded
+        tween(picker,0.2,{Size=UDim2.new(1,-16,0,expanded and 84 or 0)}):Play()
+        tween(c,0.2,{Size=UDim2.new(1,0,0,expanded and 132 or 42)}):Play()
     end)
     return c
 end
@@ -323,6 +337,7 @@ UI.Toggle(pages.Visual,"Chams",Config.Visual.Chams,function(v) Config.Visual.Cha
 UI.Toggle(pages.Visual,"Health Bar",Config.Visual.HP,function(v) Config.Visual.HP=v end)
 UI.Toggle(pages.Visual,"Names",Config.Visual.Names,function(v) Config.Visual.Names=v end)
 UI.Toggle(pages.Visual,"Distance",Config.Visual.Distance,function(v) Config.Visual.Distance=v end)
+UI.Toggle(pages.Visual,"Bots ESP",Config.Visual.Bots,function(v) Config.Visual.Bots=v end)
 UI.Section(pages.Visual,"RGB")
 UI.Toggle(pages.Visual,"RGB Tracers",Config.Colors.RGB,function(v) Config.Colors.RGB=v end)
 
@@ -365,6 +380,7 @@ UI.ColorPicker(pages.Colors,"Box",Config.Colors.Box,function(c) Config.Colors.Bo
 UI.ColorPicker(pages.Colors,"Skeleton",Config.Colors.Skeleton,function(c) Config.Colors.Skeleton=c end)
 UI.ColorPicker(pages.Colors,"Tracer",Config.Colors.Tracer,function(c) Config.Colors.Tracer=c end)
 UI.ColorPicker(pages.Colors,"Chams",Config.Colors.Chams,function(c) Config.Colors.Chams=c end)
+UI.ColorPicker(pages.Colors,"Bot Color",Config.Colors.Bot,function(c) Config.Colors.Bot=c end)
 UI.Section(pages.Colors,"HP / Text")
 UI.ColorPicker(pages.Colors,"HP Fill",Config.Colors.HP,function(c) Config.Colors.HP=c end)
 UI.ColorPicker(pages.Colors,"HP Background",Config.Colors.HP_Back,function(c) Config.Colors.HP_Back=c end)
@@ -393,6 +409,7 @@ end)
 --============================================================
 local ESP_Store = {}
 local Chams_Store = {}
+local BOT_Store = {}
 
 local function newLine(color,t) local l=Drawing.new("Line"); l.Visible=false; l.Color=color or Color3.new(1,1,1); l.Thickness=t or 1; l.Transparency=1; return l end
 local function newText(size,color)
@@ -413,22 +430,26 @@ local R15_SKELETON = {
 local R6_SKELETON = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
 local function getSkeletonConnections(char) if char:FindFirstChild("UpperTorso") then return R15_SKELETON else return R6_SKELETON end end
 
-local function createESPObjects(player)
-    if ESP_Store[player] then return end
+local function createESPObjects(store, player, isBot)
+    if store[player] then return end
+    local color = isBot and Config.Colors.Bot or Config.Colors.Box
     local s = {
         box_lines = {Drawing.new("Line"),Drawing.new("Line"),Drawing.new("Line"),Drawing.new("Line")},
         tracer = newLine(Config.Colors.Tracer,1), skeleton = {},
         hp_back_line = Drawing.new("Line"), hp_fill_line = Drawing.new("Line"),
-        name = newText(14,Config.Colors.Name), dist = newText(12,Config.Colors.Distance),
+        name = newText(14,isBot and Config.Colors.Bot or Config.Colors.Name),
+        dist = newText(12,Config.Colors.Distance),
+        isBot = isBot,
     }
-    for _,l in ipairs(s.box_lines) do l.Visible=false; l.Thickness=1; l.Transparency=1 end
+    for _,l in ipairs(s.box_lines) do l.Visible=false; l.Thickness=1; l.Transparency=1; l.Color=color end
     s.hp_back_line.Visible=false; s.hp_back_line.Thickness=3
     s.hp_fill_line.Visible=false; s.hp_fill_line.Thickness=3
-    for i=1,#R15_SKELETON do s.skeleton[i]=newLine(Config.Colors.Skeleton,1) end
-    ESP_Store[player]=s
+    for i=1,#R15_SKELETON do s.skeleton[i]=newLine(isBot and Config.Colors.Bot or Config.Colors.Skeleton,1) end
+    store[player]=s
 end
-local function removeESPObjects(player)
-    local s = ESP_Store[player]; if not s then return end
+
+local function removeESPObjects(store, player)
+    local s = store[player]; if not s then return end
     for _,l in ipairs(s.box_lines) do l:Remove() end
     if s.tracer then s.tracer:Remove() end
     for _,l in pairs(s.skeleton) do l:Remove() end
@@ -436,8 +457,9 @@ local function removeESPObjects(player)
     if s.hp_fill_line then s.hp_fill_line:Remove() end
     if s.name then s.name:Remove() end
     if s.dist then s.dist:Remove() end
-    ESP_Store[player]=nil
+    store[player]=nil
 end
+
 local function hideESP(s)
     for _,l in ipairs(s.box_lines) do l.Visible=false end
     s.tracer.Visible=false
@@ -446,22 +468,27 @@ local function hideESP(s)
     s.name.Visible=false; s.dist.Visible=false
 end
 
-local function updateESP(player,char)
-    if player==LocalPlayer or not char then if ESP_Store[player] then hideESP(ESP_Store[player]) end; return end
+-- Универсальный updateESP: работает и для игрока, и для модели-бота
+local function updateESPGeneric(store, key, char, isBot)
+    if not char then if store[key] then hideESP(store[key]) end; return end
     local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum or hum.Health<=0 then if ESP_Store[player] then hideESP(ESP_Store[player]) end; return end
-    createESPObjects(player)
-    local s = ESP_Store[player]
+    if not hum or hum.Health<=0 then if store[key] then hideESP(store[key]) end; return end
+    createESPObjects(store, key, isBot)
+    local s = store[key]
     local head = char:FindFirstChild("Head")
     local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not (head and torso and hrp) then return end
 
+    local boxColor = isBot and Config.Colors.Bot or Config.Colors.Box
+    local skelColor = isBot and Config.Colors.Bot or Config.Colors.Skeleton
+
     local headScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2,0))
     local hrpScreen = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0))
     local onScreen = headScreen.Z>0 and hrpScreen.Z>0
 
-    if Config.Visual.Enabled and Config.Visual.Box and onScreen then
+    -- Box = 4 линии
+    if Config.Visual.Enabled and Config.Visual.Box and onScreen and (not isBot or Config.Visual.Bots) then
         local height = math.abs(headScreen.Y-hrpScreen.Y)
         local width = height*0.45
         local cx = hrpScreen.X; local cy = hrpScreen.Y
@@ -472,10 +499,11 @@ local function updateESP(player,char)
         L[2].From = Vector2.new(x2,y1); L[2].To = Vector2.new(x2,y2)
         L[3].From = Vector2.new(x2,y2); L[3].To = Vector2.new(x1,y2)
         L[4].From = Vector2.new(x1,y2); L[4].To = Vector2.new(x1,y1)
-        for _,l in ipairs(L) do l.Color = Config.Colors.Box; l.Visible = true end
+        for _,l in ipairs(L) do l.Color = boxColor; l.Visible = true end
     else for _,l in ipairs(s.box_lines) do l.Visible=false end end
 
-    if Config.Visual.Enabled and Config.Visual.Skeleton then
+    -- Skeleton
+    if Config.Visual.Enabled and Config.Visual.Skeleton and (not isBot or Config.Visual.Bots) then
         local conns = getSkeletonConnections(char)
         for i=1,#s.skeleton do s.skeleton[i].Visible=false end
         for i,pair in ipairs(conns) do
@@ -487,23 +515,29 @@ local function updateESP(player,char)
                 local b = Camera:WorldToViewportPoint(p2.Position)
                 if a.Z>0 and b.Z>0 then
                     line.From = Vector2.new(a.X,a.Y); line.To = Vector2.new(b.X,b.Y)
-                    line.Color = Config.Colors.Skeleton; line.Visible = true
+                    line.Color = skelColor; line.Visible = true
                 end
             end
         end
     else for _,l in pairs(s.skeleton) do l.Visible=false end end
 
-    if Config.Visual.Enabled and Config.Visual.Tracer then
+    -- Tracer
+    if Config.Visual.Enabled and Config.Visual.Tracer and (not isBot or Config.Visual.Bots) then
         local toPos = Camera:WorldToViewportPoint(torso.Position)
         if toPos.Z>0 then
             s.tracer.From = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y)
             s.tracer.To = Vector2.new(toPos.X,toPos.Y)
-            s.tracer.Color = Config.Colors.RGB and Color3.fromHSV((tick()*0.5)%1,1,1) or Config.Colors.Tracer
+            if Config.Colors.RGB then
+                s.tracer.Color = Color3.fromHSV((tick()*0.5)%1,1,1)
+            else
+                s.tracer.Color = isBot and Config.Colors.Bot or Config.Colors.Tracer
+            end
             s.tracer.Visible = true
         else s.tracer.Visible=false end
     else s.tracer.Visible=false end
 
-    if Config.Visual.Enabled and Config.Visual.HP and Config.Visual.Box and onScreen then
+    -- HP = 2 линии
+    if Config.Visual.Enabled and Config.Visual.HP and Config.Visual.Box and onScreen and (not isBot or Config.Visual.Bots) then
         local height = math.abs(headScreen.Y-hrpScreen.Y)
         local width = height*0.45
         local cx = hrpScreen.X; local topY = hrpScreen.Y-height
@@ -515,15 +549,18 @@ local function updateESP(player,char)
         s.hp_fill_line.Color = Config.Colors.HP; s.hp_fill_line.Visible = true
     else s.hp_back_line.Visible=false; s.hp_fill_line.Visible=false end
 
-    if Config.Visual.Enabled and Config.Visual.Names and onScreen then
+    -- Name
+    if Config.Visual.Enabled and Config.Visual.Names and onScreen and (not isBot or Config.Visual.Bots) then
         local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
         if top.Z>0 then
-            s.name.Text = player.Name; s.name.Color = Config.Colors.Name
+            s.name.Text = (isBot and "[BOT] " or "")..(key.Name or char.Name)
+            s.name.Color = isBot and Config.Colors.Bot or Config.Colors.Name
             s.name.Position = Vector2.new(top.X,top.Y-14); s.name.Size = 14; s.name.Visible = true
         else s.name.Visible=false end
     else s.name.Visible=false end
 
-    if Config.Visual.Enabled and Config.Visual.Distance and onScreen then
+    -- Distance
+    if Config.Visual.Enabled and Config.Visual.Distance and onScreen and (not isBot or Config.Visual.Bots) then
         local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
         if top.Z>0 then
             local dist = math.floor((Camera.CFrame.Position-hrp.Position).Magnitude)
@@ -533,6 +570,43 @@ local function updateESP(player,char)
     else s.dist.Visible=false end
 end
 
+-- updateESP для игроков
+local function updateESP(player,char)
+    if player==LocalPlayer then if ESP_Store[player] then hideESP(ESP_Store[player]) end; return end
+    updateESPGeneric(ESP_Store, player, char, false)
+end
+
+-- updateBots
+local function isBotModel(model)
+    if not model:IsA("Model") then return false end
+    if not model:FindFirstChildOfClass("Humanoid") then return false end
+    if not model:FindFirstChild("HumanoidRootPart") then return false end
+    if Players:GetPlayerFromCharacter(model) then return false end
+    -- внешний Highlight (детекция другими читами)
+    if model:FindFirstChildOfClass("Highlight") then return true end
+    return true
+end
+
+local function updateBots()
+    if not Config.Visual.Enabled or not Config.Visual.Bots then
+        for obj, s in pairs(BOT_Store) do hideESP(s) end
+        return
+    end
+    local current = {}
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if isBotModel(obj) then
+            current[obj] = true
+            updateESPGeneric(BOT_Store, obj, obj, true)
+        end
+    end
+    for obj, s in pairs(BOT_Store) do
+        if not current[obj] or not obj.Parent then
+            removeESPObjects(BOT_Store, obj)
+        end
+    end
+end
+
+-- updateChams
 local function updateChams(player,char)
     if player==LocalPlayer or not char then
         if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end
@@ -556,9 +630,10 @@ RunService.RenderStepped:Connect(function()
         local char = p.Character
         updateESP(p,char); updateChams(p,char)
     end
+    pcall(updateBots)
 end)
 Players.PlayerRemoving:Connect(function(p)
-    removeESPObjects(p)
+    removeESPObjects(ESP_Store, p)
     if Chams_Store[p] then Chams_Store[p]:Destroy(); Chams_Store[p]=nil end
 end)
 Players.PlayerAdded:Connect(function(p)
@@ -567,7 +642,7 @@ Players.PlayerAdded:Connect(function(p)
     end)
 end)
 
---========== TARGET ==========
+--========== TARGET (FOV от ЦЕНТРА экрана) ==========
 local function isVisible(part)
     if not part then return false end
     local origin = Camera.CFrame.Position
@@ -580,7 +655,7 @@ local function isVisible(part)
 end
 
 local function getTarget(cfg)
-    local mousePos = UIS:GetMouseLocation()
+    local center = Camera.ViewportSize / 2
     local cands = {}
     for _,p in ipairs(Players:GetPlayers()) do
         if p~=LocalPlayer and p.Character then
@@ -589,7 +664,7 @@ local function getTarget(cfg)
             if part and hum and hum.Health>0 then
                 local pos,onScreen = Camera:WorldToViewportPoint(part.Position)
                 if onScreen then
-                    local dist = (Vector2.new(pos.X,pos.Y)-mousePos).Magnitude
+                    local dist = (Vector2.new(pos.X,pos.Y)-center).Magnitude
                     if dist<=cfg.FOV then
                         if not cfg.VisibleCheck or isVisible(part) then
                             table.insert(cands,{part=part,fovDist=dist,worldDist=(Camera.CFrame.Position-part.Position).Magnitude,health=hum.Health})
@@ -608,45 +683,20 @@ local function getTarget(cfg)
     return cands[1].part
 end
 
-local function getTargetAtCenter(cfg)
-    local center = Camera.ViewportSize/2
-    local cands = {}
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p~=LocalPlayer and p.Character then
-            local part = p.Character:FindFirstChild(cfg.Part)
-            local hum = p.Character:FindFirstChildOfClass("Humanoid")
-            if part and hum and hum.Health>0 then
-                local pos,onScreen = Camera:WorldToViewportPoint(part.Position)
-                if onScreen then
-                    local dist = (Vector2.new(pos.X,pos.Y)-center).Magnitude
-                    if dist<=cfg.FOV then
-                        if not cfg.VisibleCheck or isVisible(part) then
-                            table.insert(cands,{part=part,dist=dist})
-                        end
-                    end
-                end
-            end
-        end
-    end
-    if #cands==0 then return nil end
-    table.sort(cands,function(a,b) return a.dist<b.dist end)
-    return cands[1].part
-end
-
---========== FOV CIRCLES ==========
+--========== FOV CIRCLES (от центра) ==========
 local FOV_Aimbot, FOV_Silent, FOV_Trigger
-local function updateCircle(circle,cfg,mousePos)
+local function updateCircle(circle,cfg,center)
     if not circle then circle = Drawing.new("Circle") end
-    circle.Visible = true; circle.Position = mousePos; circle.Radius = cfg.FOV
+    circle.Visible = true; circle.Position = center; circle.Radius = cfg.FOV
     circle.Color = cfg.FOVColor; circle.Thickness = cfg.FOVThickness or 1
     circle.Transparency = cfg.FOVTransparency or 0.6; circle.Filled = cfg.FOVFilled or false
     return circle
 end
 RunService.RenderStepped:Connect(function()
-    local mp = UIS:GetMouseLocation()
-    if Config.Aimbot.ShowFOV and Config.Aimbot.Enabled then FOV_Aimbot = updateCircle(FOV_Aimbot,Config.Aimbot,mp) elseif FOV_Aimbot then FOV_Aimbot.Visible=false end
-    if Config.Silent.ShowFOV and Config.Silent.Enabled then FOV_Silent = updateCircle(FOV_Silent,Config.Silent,mp) elseif FOV_Silent then FOV_Silent.Visible=false end
-    if Config.Trigger.ShowFOV and Config.Trigger.Enabled then FOV_Trigger = updateCircle(FOV_Trigger,Config.Trigger,mp) elseif FOV_Trigger then FOV_Trigger.Visible=false end
+    local center = Camera.ViewportSize / 2
+    if Config.Aimbot.ShowFOV and Config.Aimbot.Enabled then FOV_Aimbot = updateCircle(FOV_Aimbot,Config.Aimbot,center) elseif FOV_Aimbot then FOV_Aimbot.Visible=false end
+    if Config.Silent.ShowFOV and Config.Silent.Enabled then FOV_Silent = updateCircle(FOV_Silent,Config.Silent,center) elseif FOV_Silent then FOV_Silent.Visible=false end
+    if Config.Trigger.ShowFOV and Config.Trigger.Enabled then FOV_Trigger = updateCircle(FOV_Trigger,Config.Trigger,center) elseif FOV_Trigger then FOV_Trigger.Visible=false end
 end)
 
 --========== AIMBOT ==========
@@ -726,7 +776,7 @@ RunService.RenderStepped:Connect(function()
     if not Config.Trigger.Enabled then return end
     if Config.Trigger.Key and not isKeyActive(Config.Trigger.Key) then return end
     if tick()-lastTrigger < Config.Trigger.Delay/1000 then return end
-    local target = getTargetAtCenter(Config.Trigger)
+    local target = getTarget(Config.Trigger)
     if target then
         lastTrigger = tick()
         if mouse1click then mouse1click()
@@ -734,4 +784,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[ESP HUB DELTA] Loaded. Menu open, FAB hidden.")
+print("[ESP HUB DELTA v5] Loaded. Bots ESP, FOV center, fixed picker.")
