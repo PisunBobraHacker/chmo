@@ -1,0 +1,834 @@
+--============================================================
+--  ESP HUB v2.0 — FINAL
+--  RightShift — меню
+--  ESP / Skeleton R6+R15 / Chams / HP / Name / Distance
+--  Aimbot / Silent Aim / Trigger Bot (центр экрана + wall check)
+--============================================================
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+--========== CONFIG ==========
+local Config = {
+    Visual = { Enabled=false, Box=true, Skeleton=true, Tracer=true, Chams=true, Names=true, HP=true, Distance=true },
+    Colors = {
+        Box=Color3.fromRGB(255,255,255), Skeleton=Color3.fromRGB(255,255,255),
+        Tracer=Color3.fromRGB(255,60,60), Chams=Color3.fromRGB(120,0,255),
+        HP=Color3.fromRGB(90,220,140), HP_Back=Color3.fromRGB(30,30,40),
+        Name=Color3.fromRGB(255,255,255), Distance=Color3.fromRGB(200,200,210),
+        RGB=false,
+    },
+    Aimbot = {
+        Enabled=false, FOV=120, Smooth=0.35, Part="Head", Mode="Camera",
+        Key=Enum.UserInputType.MouseButton2, VisibleCheck=false, Priority="Distance",
+        ShowFOV=true, FOVColor=Color3.fromRGB(255,255,255),
+        FOVThickness=1, FOVTransparency=0.6, FOVFilled=false,
+    },
+    Silent = {
+        Enabled=false, FOV=120, Part="Head", VisibleCheck=false, Priority="Distance",
+        HitboxRandom=false, ShowFOV=true, FOVColor=Color3.fromRGB(130,90,255),
+        FOVThickness=1, FOVTransparency=0.6, FOVFilled=false, Delay=0,
+    },
+    Trigger = {
+        Enabled=false, FOV=25, Part="Head", VisibleCheck=true, Delay=80,
+        Key=Enum.UserInputType.MouseButton2, ShowFOV=true,
+        FOVColor=Color3.fromRGB(255,80,80),
+        FOVThickness=1, FOVTransparency=0.6, FOVFilled=false,
+    },
+    Settings = { Keybind = Enum.KeyCode.RightShift },
+}
+
+--========== THEME ==========
+local Theme = {
+    Bg=Color3.fromRGB(14,14,18), Bg2=Color3.fromRGB(20,20,26),
+    Panel=Color3.fromRGB(26,26,33), Panel2=Color3.fromRGB(32,32,40),
+    Stroke=Color3.fromRGB(48,48,60), Accent=Color3.fromRGB(130,90,255),
+    Accent2=Color3.fromRGB(80,200,255), Text=Color3.fromRGB(235,235,245),
+    TextDim=Color3.fromRGB(140,140,155), Danger=Color3.fromRGB(220,70,90),
+}
+
+--========== UTILS ==========
+local function new(c,p,parent) local o=Instance.new(c); for k,v in pairs(p or {}) do o[k]=v end; if parent then o.Parent=parent end; return o end
+local function corner(p,r) return new("UICorner",{CornerRadius=UDim.new(0,r or 8)},p) end
+local function stroke(p,c,t,tr) return new("UIStroke",{Color=c or Theme.Stroke,Thickness=t or 1,Transparency=tr or 0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},p) end
+local function gradient(p,c1,c2,rot) return new("UIGradient",{Color=ColorSequence.new(c1,c2),Rotation=rot or 90},p) end
+local function padding(p,a) return new("UIPadding",{PaddingTop=UDim.new(0,a),PaddingBottom=UDim.new(0,a),PaddingLeft=UDim.new(0,a),PaddingRight=UDim.new(0,a)},p) end
+local function tween(o,t,p,s,d) return TweenService:Create(o,TweenInfo.new(t,s or Enum.EasingStyle.Quint,d or Enum.EasingDirection.Out),p) end
+
+--========== CONFIG SAVE ==========
+local CONFIG_PATH = "ESP_Hub_Config.json"
+local function serialize(tbl)
+    local function ser(v)
+        if type(v)=="table" then
+            local parts={}
+            for k,val in pairs(v) do
+                local key = type(k)=="string" and string.format("%q",k) or tostring(k)
+                table.insert(parts,key.."="..ser(val))
+            end
+            return "{"..table.concat(parts,",").."}"
+        elseif type(v)=="string" then return string.format("%q",v)
+        elseif type(v)=="Color3" then return string.format("Color3.new(%f,%f,%f)",v.R,v.G,v.B)
+        elseif type(v)=="EnumItem" then return string.format("Enum.%s.%s", tostring(v.EnumType):match("%.(%w+)$"), v.Name)
+        else return tostring(v) end
+    end
+    return "return "..ser(tbl)
+end
+local function saveConfig()
+    if not writefile then return end
+    local ok,data = pcall(serialize,Config)
+    if ok then pcall(writefile,CONFIG_PATH,data) end
+end
+local function loadConfig()
+    if not (isfile and readfile) then return end
+    if not isfile(CONFIG_PATH) then return end
+    local ok,data = pcall(readfile,CONFIG_PATH)
+    if ok and data then
+        local chunk = loadstring(data)
+        if chunk then
+            local success,loaded = pcall(chunk)
+            if success and type(loaded)=="table" then
+                local function merge(dst,src)
+                    for k,v in pairs(src) do
+                        if type(v)=="table" and type(dst[k])=="table" then merge(dst[k],v) else dst[k]=v end
+                    end
+                end
+                merge(Config,loaded)
+            end
+        end
+    end
+end
+loadConfig()
+task.spawn(function() while task.wait(5) do pcall(saveConfig) end end)
+game:BindToClose(function() pcall(saveConfig) end)
+
+--========== GUI ==========
+if CoreGui:FindFirstChild("ESP_Hub") then CoreGui.ESP_Hub:Destroy() end
+local gui = new("ScreenGui",{Name="ESP_Hub",ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},CoreGui)
+local backdrop = new("Frame",{Size=UDim2.fromScale(1,1),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=1,Visible=false,ZIndex=1},gui)
+local root = new("Frame",{Name="Root",Size=UDim2.new(0,620,0,440),Position=UDim2.new(0.5,-310,0.5,-220),BackgroundColor3=Theme.Bg,BorderSizePixel=0,Visible=false,ZIndex=5,ClipsDescendants=true},gui)
+corner(root,14); stroke(root,Theme.Stroke,1); gradient(root,Color3.fromRGB(22,22,30),Color3.fromRGB(12,12,16),90)
+local glow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=7},root)
+gradient(glow,Theme.Accent,Theme.Accent2,0)
+
+-- TitleBar
+local titleBar = new("Frame",{Size=UDim2.new(1,0,0,50),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=6},root)
+corner(titleBar,14)
+local logo = new("Frame",{Size=UDim2.new(0,32,0,32),Position=UDim2.new(0,16,0.5,-16),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=7},titleBar)
+corner(logo,8); gradient(logo,Theme.Accent,Theme.Accent2,45)
+new("TextLabel",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="E",Font=Enum.Font.GothamBlack,TextSize=18,TextColor3=Color3.new(1,1,1),ZIndex=8},logo)
+new("TextLabel",{Size=UDim2.new(0,200,0,20),Position=UDim2.new(0,58,0,8),BackgroundTransparency=1,Text="ESP HUB",Font=Enum.Font.GothamBlack,TextSize=16,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},titleBar)
+new("TextLabel",{Size=UDim2.new(0,200,0,14),Position=UDim2.new(0,58,0,28),BackgroundTransparency=1,Text="final v2.0  •  trigger center-screen",Font=Enum.Font.GothamMedium,TextSize=10,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=7},titleBar)
+
+local function iconBtn(text,x,color)
+    local b = new("TextButton",{Size=UDim2.new(0,26,0,26),Position=UDim2.new(1,x,0.5,-13),BackgroundColor3=Theme.Panel,Text=text,Font=Enum.Font.GothamBold,TextSize=13,TextColor3=color or Theme.Text,AutoButtonColor=false,ZIndex=7},titleBar)
+    corner(b,6)
+    b.MouseEnter:Connect(function() tween(b,0.15,{BackgroundColor3=Theme.Panel2}):Play() end)
+    b.MouseLeave:Connect(function() tween(b,0.15,{BackgroundColor3=Theme.Panel}):Play() end)
+    return b
+end
+local closeBtn = iconBtn("✕",-38,Theme.Text)
+local minBtn = iconBtn("—",-70,Theme.TextDim)
+
+-- Sidebar
+local sidebar = new("Frame",{Size=UDim2.new(0,150,1,-50),Position=UDim2.new(0,0,0,50),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=6},root)
+padding(sidebar,10)
+new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
+local pages, tabButtons = {}, {}
+local content = new("Frame",{Size=UDim2.new(1,-160,1,-60),Position=UDim2.new(0,150,0,50),BackgroundTransparency=1,ZIndex=6,ClipsDescendants=true},root)
+
+local tabsList = {
+    {Name="Visual",Icon="◉"},{Name="Aimbot",Icon="✜"},{Name="Silent",Icon="◈"},
+    {Name="Trigger",Icon="✹"},{Name="Colors",Icon="◐"},{Name="Settings",Icon="⚙"},
+}
+
+local function showPage(name)
+    for n,p in pairs(pages) do
+        if p.Visible then tween(p,0.15,{BackgroundTransparency=1}):Play(); p.Visible=false end
+    end
+    local page = pages[name]
+    if not page then return end
+    page.Visible = true
+    page.Position = UDim2.new(0,15,0,0)
+    tween(page,0.28,{Position=UDim2.new(0,0,0,0)}):Play()
+    for n,b in pairs(tabButtons) do
+        local active = (n==name)
+        tween(b,0.2,{BackgroundColor3=active and Theme.Panel or Theme.Bg2,TextColor3=active and Theme.Text or Theme.TextDim}):Play()
+        if b:FindFirstChild("Dot") then b.Dot.Visible = active end
+    end
+end
+
+for i,t in ipairs(tabsList) do
+    local btn = new("TextButton",{Size=UDim2.new(1,0,0,36),BackgroundColor3=Theme.Bg2,Text="",AutoButtonColor=false,ZIndex=7},sidebar)
+    corner(btn,8)
+    local dot = new("Frame",{Name="Dot",Size=UDim2.new(0,4,0,4),Position=UDim2.new(0,10,0.5,-2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,Visible=false,ZIndex=8},btn)
+    corner(dot,2)
+    new("TextLabel",{Size=UDim2.new(0,20,1,0),Position=UDim2.new(0,22,0,0),BackgroundTransparency=1,Text=t.Icon,Font=Enum.Font.GothamBold,TextSize=13,TextColor3=Theme.Accent,ZIndex=8},btn)
+    new("TextLabel",{Size=UDim2.new(1,-50,1,0),Position=UDim2.new(0,46,0,0),BackgroundTransparency=1,Text=t.Name,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},btn)
+    tabButtons[t.Name]=btn
+    local page = new("ScrollingFrame",{Name=t.Name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=Theme.Accent,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=false,ZIndex=7,ScrollBarImageTransparency=0.3,Padding=UDim.new(0,8)},content)
+    padding(page,8)
+    new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},page)
+    pages[t.Name]=page
+    btn.MouseButton1Click:Connect(function() showPage(t.Name) end)
+    btn.MouseEnter:Connect(function() if pages[t.Name].Visible then return end; tween(btn,0.15,{BackgroundColor3=Theme.Panel}):Play() end)
+    btn.MouseLeave:Connect(function() if pages[t.Name].Visible then return end; tween(btn,0.15,{BackgroundColor3=Theme.Bg2}):Play() end)
+end
+
+--========== UI COMPONENTS ==========
+local UI = {}
+function UI.Section(page,text)
+    local wrap = new("Frame",{Size=UDim2.new(1,0,0,30),BackgroundTransparency=1,ZIndex=7},page)
+    local bar = new("Frame",{Size=UDim2.new(0,3,0,14),Position=UDim2.new(0,4,0.5,-7),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=8},wrap)
+    corner(bar,2); gradient(bar,Theme.Accent,Theme.Accent2,90)
+    new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},wrap)
+    return wrap
+end
+local function card(page,h)
+    local c = new("Frame",{Size=UDim2.new(1,0,0,h or 38),BackgroundColor3=Theme.Panel,BorderSizePixel=0,ZIndex=7},page)
+    corner(c,8); stroke(c,Theme.Stroke,1,0.5)
+    return c
+end
+function UI.Toggle(page,label,default,callback)
+    local c = card(page,38)
+    new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},c)
+    local state = default or false
+    local track = new("Frame",{Size=UDim2.new(0,40,0,20),Position=UDim2.new(1,-52,0.5,-10),BackgroundColor3=state and Theme.Accent or Theme.Panel2,BorderSizePixel=0,ZIndex=8},c)
+    corner(track,10)
+    local knob = new("Frame",{Size=UDim2.new(0,16,0,16),Position=state and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=9},track)
+    corner(knob,8)
+    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=10},c)
+    hit.MouseButton1Click:Connect(function()
+        state = not state
+        tween(track,0.22,{BackgroundColor3=state and Theme.Accent or Theme.Panel2}):Play()
+        tween(knob,0.22,{Position=state and UDim2.new(1,-18,0.5,-8) or UDim2.new(0,2,0.5,-8)}):Play()
+        if callback then callback(state) end
+    end)
+    hit.MouseEnter:Connect(function() tween(c,0.15,{BackgroundColor3=Theme.Panel2}):Play() end)
+    hit.MouseLeave:Connect(function() tween(c,0.15,{BackgroundColor3=Theme.Panel}):Play() end)
+    return c
+end
+function UI.Slider(page,label,min,max,default,callback)
+    local c = card(page,54)
+    new("TextLabel",{Size=UDim2.new(1,-24,0,18),Position=UDim2.new(0,14,0,8),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},c)
+    local val = new("TextLabel",{Size=UDim2.new(0,50,0,18),Position=UDim2.new(1,-64,0,8),BackgroundTransparency=1,Text=tostring(default),Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=8},c)
+    local bar = new("Frame",{Size=UDim2.new(1,-28,0,6),Position=UDim2.new(0,14,0,36),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=8},c)
+    corner(bar,3)
+    local fill = new("Frame",{Size=UDim2.new((default-min)/(max-min),0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=8},bar)
+    corner(fill,3); gradient(fill,Theme.Accent,Theme.Accent2,0)
+    local thumb = new("Frame",{Size=UDim2.new(0,12,0,12),Position=UDim2.new((default-min)/(max-min),-6,0.5,-6),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=9},bar)
+    corner(thumb,6)
+    local value = default
+    local dragging = false
+    local hit = new("TextButton",{Size=UDim2.new(1,0,0,30),Position=UDim2.new(0,0,0,24),BackgroundTransparency=1,Text="",ZIndex=10},c)
+    local function upd(x)
+        local rel = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+        value = math.floor(min+(max-min)*rel+0.5)
+        fill.Size = UDim2.new(rel,0,1,0)
+        thumb.Position = UDim2.new(rel,-6,0.5,-6)
+        val.Text = tostring(value)
+        if callback then callback(value) end
+    end
+    hit.MouseButton1Down:Connect(function() dragging=true; upd(UIS:GetMouseLocation().X) end)
+    UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+    UIS.InputChanged:Connect(function(i) if dragging and i.UserInputType==Enum.UserInputType.MouseMovement then upd(i.Position.X) end end)
+    return c
+end
+function UI.Button(page,label,callback,color)
+    local b = new("TextButton",{Size=UDim2.new(1,0,0,34),BackgroundColor3=color or Theme.Accent,Text=label,Font=Enum.Font.GothamBold,TextSize=13,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=7},page)
+    corner(b,8); gradient(b,color or Theme.Accent,color or Theme.Accent2,0)
+    b.MouseButton1Click:Connect(function() if callback then callback() end end)
+    return b
+end
+function UI.ColorPicker(page,label,default,callback)
+    local c = card(page,40)
+    new("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},c)
+    local sw = new("Frame",{Size=UDim2.new(0,44,0,22),Position=UDim2.new(1,-58,0.5,-11),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,ZIndex=8},c)
+    corner(sw,5); stroke(sw,Theme.Stroke,1)
+    local expanded = false
+    local picker = new("Frame",{Size=UDim2.new(1,-20,0,0),Position=UDim2.new(0,10,0,44),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=8},c)
+    corner(picker,8); padding(picker,8)
+    local h,s,v = (default or Color3.new(1,1,1)):ToHSV()
+    local function hsvSlider(name,idx,def,cb)
+        local f = new("Frame",{Size=UDim2.new(1,0,0,22),Position=UDim2.new(0,0,0,idx*24),BackgroundTransparency=1,ZIndex=9},picker)
+        new("TextLabel",{Size=UDim2.new(0,34,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=9},f)
+        local bar = new("Frame",{Size=UDim2.new(1,-44,0,5),Position=UDim2.new(0,40,0.5,-2.5),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=9},f)
+        corner(bar,3)
+        local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=9},bar)
+        corner(fill,3)
+        local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=10},bar)
+        local drag = false
+        local function upd(x)
+            local rel = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+            fill.Size = UDim2.new(rel,0,1,0)
+            cb(rel)
+        end
+        hit.MouseButton1Down:Connect(function() drag=true; upd(UIS:GetMouseLocation().X) end)
+        UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end end)
+        UIS.InputChanged:Connect(function(i) if drag and i.UserInputType==Enum.UserInputType.MouseMovement then upd(i.Position.X) end end)
+    end
+    local function apply()
+        local col = Color3.fromHSV(h,s,v)
+        sw.BackgroundColor3 = col
+        if callback then callback(col) end
+    end
+    hsvSlider("H",0,h,function(r) h=r; apply() end)
+    hsvSlider("S",1,s,function(r) s=r; apply() end)
+    hsvSlider("V",2,v,function(r) v=r; apply() end)
+    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=10},c)
+    hit.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        picker.Visible = expanded
+        tween(picker,0.25,{Size=UDim2.new(1,-20,0,expanded and 80 or 0)}):Play()
+        tween(c,0.25,{Size=UDim2.new(1,0,0,expanded and 122 or 40)}):Play()
+    end)
+    return c
+end
+function UI.Dropdown(page,label,options,default,callback)
+    local c = card(page,38)
+    new("TextLabel",{Size=UDim2.new(1,-120,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},c)
+    local current = default or options[1]
+    local valLbl = new("TextLabel",{Size=UDim2.new(0,90,1,0),Position=UDim2.new(1,-104,0,0),BackgroundTransparency=1,Text=current,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=8},c)
+    new("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(1,-16,0,0),BackgroundTransparency=1,Text="▾",Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.TextDim,ZIndex=8},c)
+    local expanded = false
+    local list = new("Frame",{Size=UDim2.new(1,-20,0,0),Position=UDim2.new(0,10,0,44),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=9},c)
+    corner(list,8); padding(list,6)
+    new("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder},list)
+    for _,opt in ipairs(options) do
+        local ob = new("TextButton",{Size=UDim2.new(1,0,0,26),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=10},list)
+        corner(ob,6)
+        ob.MouseEnter:Connect(function() tween(ob,0.12,{BackgroundColor3=Theme.Panel2}):Play() end)
+        ob.MouseLeave:Connect(function() tween(ob,0.12,{BackgroundColor3=Theme.Panel}):Play() end)
+        ob.MouseButton1Click:Connect(function()
+            current = opt; valLbl.Text = opt
+            if callback then callback(opt) end
+            expanded = false
+            tween(list,0.2,{Size=UDim2.new(1,-20,0,0)}):Play()
+            tween(c,0.2,{Size=UDim2.new(1,0,0,38)}):Play()
+            task.wait(0.2); list.Visible = false
+        end)
+    end
+    local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=11},c)
+    hit.MouseButton1Click:Connect(function()
+        expanded = not expanded; list.Visible = expanded
+        local h = math.min(#options*28+12, 180)
+        tween(list,0.22,{Size=UDim2.new(1,-20,0,expanded and h or 0)}):Play()
+        tween(c,0.22,{Size=UDim2.new(1,0,0,expanded and (38+h+6) or 38)}):Play()
+    end)
+    return c
+end
+function UI.Keybind(page,label,default,callback)
+    local c = card(page,38)
+    new("TextLabel",{Size=UDim2.new(1,-120,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=8},c)
+    local current = default
+    local btn = new("TextButton",{Size=UDim2.new(0,100,0,24),Position=UDim2.new(1,-114,0.5,-12),BackgroundColor3=Theme.Panel2,Text=tostring(current and (current.Name or current) or "None"),Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,AutoButtonColor=false,ZIndex=8},c)
+    corner(btn,6); stroke(btn,Theme.Accent,1,0.6)
+    local listening = false
+    btn.MouseButton1Click:Connect(function() listening=true; btn.Text="..."; btn.TextColor3=Theme.Danger end)
+    UIS.InputBegan:Connect(function(input)
+        if not listening then return end
+        if input.UserInputType==Enum.UserInputType.Keyboard then current = input.KeyCode
+        elseif input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.MouseButton2 then current = input.UserInputType end
+        listening=false; btn.Text = tostring(current.Name or current); btn.TextColor3=Theme.Accent
+        if callback then callback(current) end
+    end)
+    return c
+end
+
+--========== FILL TABS ==========
+-- Visual
+UI.Section(pages.Visual,"ESP")
+UI.Toggle(pages.Visual,"ESP Enabled",Config.Visual.Enabled,function(v) Config.Visual.Enabled=v end)
+UI.Toggle(pages.Visual,"Boxes",Config.Visual.Box,function(v) Config.Visual.Box=v end)
+UI.Toggle(pages.Visual,"Skeleton",Config.Visual.Skeleton,function(v) Config.Visual.Skeleton=v end)
+UI.Toggle(pages.Visual,"Tracer",Config.Visual.Tracer,function(v) Config.Visual.Tracer=v end)
+UI.Toggle(pages.Visual,"Chams",Config.Visual.Chams,function(v) Config.Visual.Chams=v end)
+UI.Toggle(pages.Visual,"Health Bar",Config.Visual.HP,function(v) Config.Visual.HP=v end)
+UI.Toggle(pages.Visual,"Names",Config.Visual.Names,function(v) Config.Visual.Names=v end)
+UI.Toggle(pages.Visual,"Distance",Config.Visual.Distance,function(v) Config.Visual.Distance=v end)
+UI.Section(pages.Visual,"RGB")
+UI.Toggle(pages.Visual,"RGB Tracers",Config.Colors.RGB,function(v) Config.Colors.RGB=v end)
+
+-- Aimbot
+UI.Section(pages.Aimbot,"Main")
+UI.Toggle(pages.Aimbot,"Enabled",Config.Aimbot.Enabled,function(v) Config.Aimbot.Enabled=v end)
+UI.Keybind(pages.Aimbot,"Activation Key",Config.Aimbot.Key,function(k) Config.Aimbot.Key=k end)
+UI.Dropdown(pages.Aimbot,"Mode",{"Camera","Mouse"},Config.Aimbot.Mode,function(v) Config.Aimbot.Mode=v end)
+UI.Dropdown(pages.Aimbot,"Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},Config.Aimbot.Part,function(v) Config.Aimbot.Part=v end)
+UI.Section(pages.Aimbot,"Tuning")
+UI.Slider(pages.Aimbot,"FOV",10,600,Config.Aimbot.FOV,function(v) Config.Aimbot.FOV=v end)
+UI.Slider(pages.Aimbot,"Smooth %",1,100,math.floor(Config.Aimbot.Smooth*100),function(v) Config.Aimbot.Smooth=v/100 end)
+UI.Section(pages.Aimbot,"Targeting")
+UI.Toggle(pages.Aimbot,"Visible Check",Config.Aimbot.VisibleCheck,function(v) Config.Aimbot.VisibleCheck=v end)
+UI.Dropdown(pages.Aimbot,"Priority",{"Distance","FOV","Health"},Config.Aimbot.Priority,function(v) Config.Aimbot.Priority=v end)
+UI.Section(pages.Aimbot,"FOV Circle")
+UI.Toggle(pages.Aimbot,"Show FOV",Config.Aimbot.ShowFOV,function(v) Config.Aimbot.ShowFOV=v end)
+UI.ColorPicker(pages.Aimbot,"FOV Color",Config.Aimbot.FOVColor,function(c) Config.Aimbot.FOVColor=c end)
+UI.Slider(pages.Aimbot,"Thickness",1,5,Config.Aimbot.FOVThickness,function(v) Config.Aimbot.FOVThickness=v end)
+UI.Slider(pages.Aimbot,"Transparency %",0,100,math.floor(Config.Aimbot.FOVTransparency*100),function(v) Config.Aimbot.FOVTransparency=v/100 end)
+UI.Toggle(pages.Aimbot,"Filled",Config.Aimbot.FOVFilled,function(v) Config.Aimbot.FOVFilled=v end)
+
+-- Silent
+UI.Section(pages.Silent,"Main")
+UI.Toggle(pages.Silent,"Enabled",Config.Silent.Enabled,function(v) Config.Silent.Enabled=v end)
+UI.Dropdown(pages.Silent,"Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},Config.Silent.Part,function(v) Config.Silent.Part=v end)
+UI.Slider(pages.Silent,"FOV",10,600,Config.Silent.FOV,function(v) Config.Silent.FOV=v end)
+UI.Section(pages.Silent,"Advanced")
+UI.Toggle(pages.Silent,"Visible Check",Config.Silent.VisibleCheck,function(v) Config.Silent.VisibleCheck=v end)
+UI.Dropdown(pages.Silent,"Priority",{"Distance","FOV","Health"},Config.Silent.Priority,function(v) Config.Silent.Priority=v end)
+UI.Toggle(pages.Silent,"Hitbox Random",Config.Silent.HitboxRandom,function(v) Config.Silent.HitboxRandom=v end)
+UI.Slider(pages.Silent,"Delay (ms)",0,500,Config.Silent.Delay,function(v) Config.Silent.Delay=v end)
+UI.Section(pages.Silent,"FOV Circle")
+UI.Toggle(pages.Silent,"Show FOV",Config.Silent.ShowFOV,function(v) Config.Silent.ShowFOV=v end)
+UI.ColorPicker(pages.Silent,"FOV Color",Config.Silent.FOVColor,function(c) Config.Silent.FOVColor=c end)
+UI.Slider(pages.Silent,"Thickness",1,5,Config.Silent.FOVThickness,function(v) Config.Silent.FOVThickness=v end)
+UI.Slider(pages.Silent,"Transparency %",0,100,math.floor(Config.Silent.FOVTransparency*100),function(v) Config.Silent.FOVTransparency=v/100 end)
+UI.Toggle(pages.Silent,"Filled",Config.Silent.FOVFilled,function(v) Config.Silent.FOVFilled=v end)
+
+-- Trigger
+UI.Section(pages.Trigger,"Main")
+UI.Toggle(pages.Trigger,"Enabled",Config.Trigger.Enabled,function(v) Config.Trigger.Enabled=v end)
+UI.Keybind(pages.Trigger,"Activation Key",Config.Trigger.Key,function(k) Config.Trigger.Key=k end)
+UI.Dropdown(pages.Trigger,"Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},Config.Trigger.Part,function(v) Config.Trigger.Part=v end)
+UI.Section(pages.Trigger,"Tuning")
+UI.Slider(pages.Trigger,"FOV (center)",5,100,Config.Trigger.FOV,function(v) Config.Trigger.FOV=v end)
+UI.Slider(pages.Trigger,"Delay (ms)",0,500,Config.Trigger.Delay,function(v) Config.Trigger.Delay=v end)
+UI.Toggle(pages.Trigger,"Visible Check",Config.Trigger.VisibleCheck,function(v) Config.Trigger.VisibleCheck=v end)
+UI.Section(pages.Trigger,"FOV Circle")
+UI.Toggle(pages.Trigger,"Show FOV",Config.Trigger.ShowFOV,function(v) Config.Trigger.ShowFOV=v end)
+UI.ColorPicker(pages.Trigger,"FOV Color",Config.Trigger.FOVColor,function(c) Config.Trigger.FOVColor=c end)
+UI.Slider(pages.Trigger,"Thickness",1,5,Config.Trigger.FOVThickness,function(v) Config.Trigger.FOVThickness=v end)
+UI.Slider(pages.Trigger,"Transparency %",0,100,math.floor(Config.Trigger.FOVTransparency*100),function(v) Config.Trigger.FOVTransparency=v/100 end)
+UI.Toggle(pages.Trigger,"Filled",Config.Trigger.FOVFilled,function(v) Config.Trigger.FOVFilled=v end)
+
+-- Colors
+UI.Section(pages.Colors,"ESP")
+UI.ColorPicker(pages.Colors,"Box",Config.Colors.Box,function(c) Config.Colors.Box=c end)
+UI.ColorPicker(pages.Colors,"Skeleton",Config.Colors.Skeleton,function(c) Config.Colors.Skeleton=c end)
+UI.ColorPicker(pages.Colors,"Tracer",Config.Colors.Tracer,function(c) Config.Colors.Tracer=c end)
+UI.ColorPicker(pages.Colors,"Chams",Config.Colors.Chams,function(c) Config.Colors.Chams=c end)
+UI.Section(pages.Colors,"HP Bar")
+UI.ColorPicker(pages.Colors,"HP Fill",Config.Colors.HP,function(c) Config.Colors.HP=c end)
+UI.ColorPicker(pages.Colors,"HP Background",Config.Colors.HP_Back,function(c) Config.Colors.HP_Back=c end)
+UI.Section(pages.Colors,"Text")
+UI.ColorPicker(pages.Colors,"Name",Config.Colors.Name,function(c) Config.Colors.Name=c end)
+UI.ColorPicker(pages.Colors,"Distance",Config.Colors.Distance,function(c) Config.Colors.Distance=c end)
+
+-- Settings
+UI.Section(pages.Settings,"Menu")
+UI.Keybind(pages.Settings,"Menu Key",Config.Settings.Keybind,function(k) Config.Settings.Keybind=k end)
+UI.Button(pages.Settings,"Save Config",function() saveConfig() end)
+UI.Button(pages.Settings,"Load Config",function() loadConfig() end)
+UI.Button(pages.Settings,"Destroy Hub",function() gui:Destroy() end,Theme.Danger)
+
+showPage("Visual")
+
+--========== OPEN/CLOSE ==========
+local isOpen = false
+local function openMenu()
+    if isOpen then return end
+    isOpen = true
+    root.Visible = true; backdrop.Visible = true
+    root.Size = UDim2.new(0,560,0,380); root.Position = UDim2.new(0.5,-280,0.5,-210)
+    root.BackgroundTransparency = 0.4
+    tween(backdrop,0.3,{BackgroundTransparency=0.55}):Play()
+    tween(root,0.35,{Size=UDim2.new(0,620,0,440),Position=UDim2.new(0.5,-310,0.5,-220),BackgroundTransparency=0},Enum.EasingStyle.Back,Enum.EasingDirection.Out):Play()
+end
+local function closeMenu()
+    if not isOpen then return end
+    isOpen = false
+    tween(backdrop,0.25,{BackgroundTransparency=1}):Play()
+    local t = tween(root,0.25,{Size=UDim2.new(0,560,0,380),Position=UDim2.new(0.5,-280,0.5,-210),BackgroundTransparency=1},Enum.EasingStyle.Quad,Enum.EasingDirection.In)
+    t:Play()
+    t.Completed:Connect(function() if not isOpen then root.Visible=false; backdrop.Visible=false; root.BackgroundTransparency=0 end end)
+end
+closeBtn.MouseButton1Click:Connect(closeMenu)
+minBtn.MouseButton1Click:Connect(closeMenu)
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Config.Settings.Keybind then
+        if isOpen then closeMenu() else openMenu() end
+    end
+end)
+
+-- Drag
+local dragging, dragStart, startPos
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton1 then
+        dragging=true; dragStart=input.Position; startPos=root.Position
+    end
+end)
+UIS.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType==Enum.UserInputType.MouseMovement then
+        local d = input.Position-dragStart
+        root.Position = UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
+end)
+
+--============================================================
+--  ESP LOGIC
+--============================================================
+local ESP_Store = {}
+local Chams_Store = {}
+
+local function newLine(color,t) local l=Drawing.new("Line"); l.Visible=false; l.Color=color or Color3.new(1,1,1); l.Thickness=t or 1; l.Transparency=1; return l end
+local function newText(size,color)
+    local t = Drawing.new("Text")
+    t.Visible=false; t.Center=true; t.Outline=true; t.OutlineColor=Color3.new(0,0,0)
+    t.Size=size or 14; t.Color=color or Color3.new(1,1,1); t.Font=Drawing.Fonts.Plex
+    return t
+end
+
+local R15_SKELETON = {
+    {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
+    {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
+    {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
+    {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
+    {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
+}
+local R6_SKELETON = {
+    {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"},
+}
+local function getSkeletonConnections(char)
+    if char:FindFirstChild("UpperTorso") then return R15_SKELETON else return R6_SKELETON end
+end
+
+local function createESPObjects(player)
+    if ESP_Store[player] then return end
+    local s = {
+        box=Drawing.new("Quad"), tracer=newLine(Config.Colors.Tracer,1), skeleton={},
+        hp_back=Drawing.new("Square"), hp_fill=Drawing.new("Square"),
+        name=newText(14,Config.Colors.Name), dist=newText(12,Config.Colors.Distance),
+    }
+    s.box.Visible=false; s.box.Filled=false; s.box.Thickness=1; s.box.Transparency=1
+    s.hp_back.Visible=false; s.hp_back.Filled=true; s.hp_back.Thickness=0
+    s.hp_fill.Visible=false; s.hp_fill.Filled=true; s.hp_fill.Thickness=0
+    for i=1,#R15_SKELETON do s.skeleton[i]=newLine(Config.Colors.Skeleton,1) end
+    ESP_Store[player]=s
+end
+local function removeESPObjects(player)
+    local s = ESP_Store[player]; if not s then return end
+    if s.box then s.box:Remove() end
+    if s.tracer then s.tracer:Remove() end
+    for _,l in pairs(s.skeleton) do l:Remove() end
+    if s.hp_back then s.hp_back:Remove() end
+    if s.hp_fill then s.hp_fill:Remove() end
+    if s.name then s.name:Remove() end
+    if s.dist then s.dist:Remove() end
+    ESP_Store[player]=nil
+end
+local function hideESP(s)
+    s.box.Visible=false; s.tracer.Visible=false
+    for _,l in pairs(s.skeleton) do l.Visible=false end
+    s.hp_back.Visible=false; s.hp_fill.Visible=false
+    s.name.Visible=false; s.dist.Visible=false
+end
+
+local function updateESP(player,char)
+    if player==LocalPlayer or not char then if ESP_Store[player] then hideESP(ESP_Store[player]) end; return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health<=0 then if ESP_Store[player] then hideESP(ESP_Store[player]) end; return end
+    createESPObjects(player)
+    local s = ESP_Store[player]
+    local head = char:FindFirstChild("Head")
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not (head and torso and hrp) then return end
+
+    local headScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2,0))
+    local hrpScreen = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0))
+    local onScreen = headScreen.Z>0 and hrpScreen.Z>0
+
+    -- Box
+    if Config.Visual.Enabled and Config.Visual.Box and onScreen then
+        local height = math.abs(headScreen.Y-hrpScreen.Y)
+        local width = height*0.45
+        local cx = hrpScreen.X; local cy = hrpScreen.Y
+        s.box.PointA = Vector2.new(cx-width/2,cy-height)
+        s.box.PointB = Vector2.new(cx+width/2,cy-height)
+        s.box.PointC = Vector2.new(cx+width/2,cy)
+        s.box.PointD = Vector2.new(cx-width/2,cy)
+        s.box.Color = Config.Colors.Box; s.box.Visible = true
+    else s.box.Visible=false end
+
+    -- Skeleton
+    if Config.Visual.Enabled and Config.Visual.Skeleton then
+        local conns = getSkeletonConnections(char)
+        for i=1,#s.skeleton do s.skeleton[i].Visible=false end
+        for i,pair in ipairs(conns) do
+            local p1 = char:FindFirstChild(pair[1])
+            local p2 = char:FindFirstChild(pair[2])
+            local line = s.skeleton[i]
+            if p1 and p2 and line then
+                local a = Camera:WorldToViewportPoint(p1.Position)
+                local b = Camera:WorldToViewportPoint(p2.Position)
+                if a.Z>0 and b.Z>0 then
+                    line.From = Vector2.new(a.X,a.Y); line.To = Vector2.new(b.X,b.Y)
+                    line.Color = Config.Colors.Skeleton; line.Visible = true
+                end
+            end
+        end
+    else for _,l in pairs(s.skeleton) do l.Visible=false end end
+
+    -- Tracer
+    if Config.Visual.Enabled and Config.Visual.Tracer then
+        local toPos = Camera:WorldToViewportPoint(torso.Position)
+        if toPos.Z>0 then
+            s.tracer.From = Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y)
+            s.tracer.To = Vector2.new(toPos.X,toPos.Y)
+            s.tracer.Color = Config.Colors.RGB and Color3.fromHSV((tick()*0.5)%1,1,1) or Config.Colors.Tracer
+            s.tracer.Visible = true
+        else s.tracer.Visible=false end
+    else s.tracer.Visible=false end
+
+    -- HP
+    if Config.Visual.Enabled and Config.Visual.HP and Config.Visual.Box and onScreen then
+        local height = math.abs(headScreen.Y-hrpScreen.Y)
+        local width = height*0.45
+        local cx = hrpScreen.X; local topY = hrpScreen.Y-height
+        local barW = 3; local barX = cx-width/2-6
+        s.hp_back.Size = Vector2.new(barW,height); s.hp_back.Position = Vector2.new(barX,topY)
+        s.hp_back.Color = Config.Colors.HP_Back; s.hp_back.Visible = true
+        local frac = math.clamp(hum.Health/hum.MaxHealth,0,1)
+        local fillH = height*frac
+        s.hp_fill.Size = Vector2.new(barW,fillH); s.hp_fill.Position = Vector2.new(barX,topY+(height-fillH))
+        s.hp_fill.Color = Config.Colors.HP; s.hp_fill.Visible = true
+    else s.hp_back.Visible=false; s.hp_fill.Visible=false end
+
+    -- Name
+    if Config.Visual.Enabled and Config.Visual.Names and onScreen then
+        local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
+        if top.Z>0 then
+            s.name.Text = player.Name; s.name.Color = Config.Colors.Name
+            s.name.Position = Vector2.new(top.X,top.Y-14); s.name.Size = 14; s.name.Visible = true
+        else s.name.Visible=false end
+    else s.name.Visible=false end
+
+    -- Distance
+    if Config.Visual.Enabled and Config.Visual.Distance and onScreen then
+        local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
+        if top.Z>0 then
+            local dist = math.floor((Camera.CFrame.Position-hrp.Position).Magnitude)
+            s.dist.Text = tostring(dist).."m"; s.dist.Color = Config.Colors.Distance
+            s.dist.Position = Vector2.new(top.X,top.Y+2); s.dist.Size = 12; s.dist.Visible = true
+        else s.dist.Visible=false end
+    else s.dist.Visible=false end
+end
+
+local function updateChams(player,char)
+    if player==LocalPlayer or not char then
+        if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end
+        return
+    end
+    if not Config.Visual.Enabled or not Config.Visual.Chams then
+        if Chams_Store[player] then Chams_Store[player]:Destroy(); Chams_Store[player]=nil end
+        return
+    end
+    if not Chams_Store[player] then
+        local hl = Instance.new("Highlight")
+        hl.Name="ESP_Chams"; hl.FillTransparency=0.5; hl.OutlineTransparency=1
+        hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop; hl.Parent=char
+        Chams_Store[player]=hl
+    end
+    Chams_Store[player].FillColor = Config.Colors.Chams
+end
+
+RunService.RenderStepped:Connect(function()
+    for _,p in ipairs(Players:GetPlayers()) do
+        local char = p.Character
+        updateESP(p,char); updateChams(p,char)
+    end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    removeESPObjects(p)
+    if Chams_Store[p] then Chams_Store[p]:Destroy(); Chams_Store[p]=nil end
+end)
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        if Chams_Store[p] then Chams_Store[p]:Destroy(); Chams_Store[p]=nil end
+    end)
+end)
+
+--============================================================
+--  TARGET SELECTION
+--============================================================
+local function isVisible(part)
+    if not part then return false end
+    local origin = Camera.CFrame.Position
+    local dir = part.Position-origin
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { LocalPlayer.Character, Camera }
+    local result = workspace:Raycast(origin,dir,params)
+    return result==nil or result.Instance:IsDescendantOf(part.Parent)
+end
+
+local function getTarget(cfg)
+    local mousePos = UIS:GetMouseLocation()
+    local cands = {}
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=LocalPlayer and p.Character then
+            local part = p.Character:FindFirstChild(cfg.Part)
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if part and hum and hum.Health>0 then
+                local pos,onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X,pos.Y)-mousePos).Magnitude
+                    if dist<=cfg.FOV then
+                        if not cfg.VisibleCheck or isVisible(part) then
+                            table.insert(cands,{part=part,fovDist=dist,worldDist=(Camera.CFrame.Position-part.Position).Magnitude,health=hum.Health})
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if #cands==0 then return nil end
+    table.sort(cands,function(a,b)
+        if cfg.Priority=="FOV" then return a.fovDist<b.fovDist
+        elseif cfg.Priority=="Health" then return a.health<b.health
+        else return a.worldDist<b.worldDist end
+    end)
+    return cands[1].part
+end
+
+--============================================================
+--  FOV CIRCLES
+--============================================================
+local FOV_Aimbot, FOV_Silent, FOV_Trigger
+local function updateCircle(circle,cfg,mousePos)
+    if not circle then circle = Drawing.new("Circle") end
+    circle.Visible = true; circle.Position = mousePos; circle.Radius = cfg.FOV
+    circle.Color = cfg.FOVColor; circle.Thickness = cfg.FOVThickness or 1
+    circle.Transparency = cfg.FOVTransparency or 0.6; circle.Filled = cfg.FOVFilled or false
+    return circle
+end
+RunService.RenderStepped:Connect(function()
+    local mp = UIS:GetMouseLocation()
+    if Config.Aimbot.ShowFOV and Config.Aimbot.Enabled then FOV_Aimbot = updateCircle(FOV_Aimbot,Config.Aimbot,mp) elseif FOV_Aimbot then FOV_Aimbot.Visible=false end
+    if Config.Silent.ShowFOV and Config.Silent.Enabled then FOV_Silent = updateCircle(FOV_Silent,Config.Silent,mp) elseif FOV_Silent then FOV_Silent.Visible=false end
+    if Config.Trigger.ShowFOV and Config.Trigger.Enabled then FOV_Trigger = updateCircle(FOV_Trigger,Config.Trigger,mp) elseif FOV_Trigger then FOV_Trigger.Visible=false end
+end)
+
+--============================================================
+--  AIMBOT
+--============================================================
+local function isKeyActive(k)
+    if typeof(k)=="EnumItem" then
+        if k.EnumType==Enum.KeyCode then return UIS:IsKeyDown(k)
+        elseif k.EnumType==Enum.UserInputType then return UIS:IsMouseButtonPressed(k) end
+    end
+    return false
+end
+RunService.RenderStepped:Connect(function()
+    if not Config.Aimbot.Enabled or not isKeyActive(Config.Aimbot.Key) then return end
+    local target = getTarget(Config.Aimbot); if not target then return end
+    if Config.Aimbot.Mode=="Camera" then
+        local cur = Camera.CFrame
+        local goal = CFrame.lookAt(cur.Position,target.Position)
+        Camera.CFrame = cur:Lerp(goal,Config.Aimbot.Smooth)
+    else
+        local pos,onScreen = Camera:WorldToViewportPoint(target.Position)
+        if onScreen and mousemoverel then
+            local c = Camera.ViewportSize/2
+            mousemoverel((pos.X-c.X)*Config.Aimbot.Smooth,(pos.Y-c.Y)*Config.Aimbot.Smooth)
+        end
+    end
+end)
+
+--============================================================
+--  SILENT AIM
+--============================================================
+local function randomizeHit(part)
+    if not Config.Silent.HitboxRandom then return part.Position end
+    local s = part.Size
+    return part.Position + Vector3.new((math.random()-0.5)*s.X*0.6,(math.random()-0.5)*s.Y*0.6,(math.random()-0.5)*s.Z*0.6)
+end
+local lastSilent = 0
+local oldNamecall
+oldNamecall = hookmetamethod(game,"__namecall",function(self,...)
+    local method = getnamecallmethod()
+    local args = {...}
+    if not checkcaller() and Config.Silent.Enabled then
+        if method=="Raycast" and self==workspace then
+            if tick()-lastSilent >= Config.Silent.Delay/1000 then
+                local target = getTarget(Config.Silent)
+                if target then
+                    lastSilent = tick()
+                    local origin = args[1]; local dir = args[2]
+                    args[2] = (randomizeHit(target)-origin).Unit*dir.Magnitude
+                    return oldNamecall(self,unpack(args))
+                end
+            end
+        elseif method=="FindPartOnRay" or method=="FindPartOnRayWithIgnoreList" then
+            local target = getTarget(Config.Silent)
+            if target then
+                local ray = args[1]
+                if typeof(ray)=="Ray" then
+                    args[1] = Ray.new(ray.Origin,(randomizeHit(target)-ray.Origin).Unit*ray.Direction.Magnitude)
+                    return oldNamecall(self,unpack(args))
+                end
+            end
+        end
+    end
+    return oldNamecall(self,...)
+end)
+local oldIndex
+oldIndex = hookmetamethod(game,"__index",function(self,key)
+    if not checkcaller() and Config.Silent.Enabled then
+        if self==Mouse and (key=="Hit" or key=="Target") then
+            local target = getTarget(Config.Silent)
+            if target then return key=="Hit" and CFrame.new(randomizeHit(target)) or target end
+        end
+    end
+    return oldIndex(self,key)
+end)
+
+--============================================================
+--  TRIGGER BOT (центр экрана + wall check)
+--============================================================
+local function getTargetAtCenter(cfg)
+    local center = Camera.ViewportSize/2
+    local cands = {}
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p~=LocalPlayer and p.Character then
+            local part = p.Character:FindFirstChild(cfg.Part)
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if part and hum and hum.Health>0 then
+                local pos,onScreen = Camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local dist = (Vector2.new(pos.X,pos.Y)-center).Magnitude
+                    if dist<=cfg.FOV then
+                        if not cfg.VisibleCheck or isVisible(part) then
+                            table.insert(cands,{part=part,dist=dist})
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if #cands==0 then return nil end
+    table.sort(cands,function(a,b) return a.dist<b.dist end)
+    return cands[1].part
+end
+
+local lastTrigger = 0
+RunService.RenderStepped:Connect(function()
+    if not Config.Trigger.Enabled then return end
+    if not isKeyActive(Config.Trigger.Key) then return end
+    if tick()-lastTrigger < Config.Trigger.Delay/1000 then return end
+    local target = getTargetAtCenter(Config.Trigger)
+    if target then
+        lastTrigger = tick()
+        if mouse1click then mouse1click()
+        elseif mouse1press and mouse1release then mouse1press(); task.wait(0.02); mouse1release() end
+    end
+end)
+
+print("[ESP HUB v2.0] Loaded. RightShift — menu.")
