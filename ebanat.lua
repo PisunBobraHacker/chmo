@@ -1,7 +1,6 @@
 --============================================================
---  RGB HUB MOBILE — v10 (SCROLL SLIDER PER TAB)
---  onTap на InputBegan (примитив, работает на Delta)
---  Свой слайдер прокрутки для каждой вкладки
+--  RGB HUB MOBILE — v11 (OPTIMIZED)
+--  RGB 15Hz, ESP 30Hz, боты раз в 0.5с, без UIStroke на карточках
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -38,21 +37,22 @@ local Theme = {
     TextDim=Color3.fromRGB(140,140,155), Danger=Color3.fromRGB(220,70,90),
 }
 
---========== RGB MANAGER ==========
+--========== RGB MANAGER (15 Hz) ==========
 local RGB = { enabled=true, speed=0.5, elements={}, strokes={} }
 local function rgbColor(offset) return Color3.fromHSV((tick()*RGB.speed+(offset or 0))%1,1,1) end
 local function addRGB(obj,prop,offset) table.insert(RGB.elements,{obj=obj,prop=prop,offset=offset or math.random()*0.3}) end
 local function addRGBStroke(s,offset) table.insert(RGB.strokes,{obj=s,offset=offset or math.random()*0.3}) end
-RunService.RenderStepped:Connect(function()
-    if not RGB.enabled then return end
-    for _,e in ipairs(RGB.elements) do pcall(function() e.obj[e.prop]=rgbColor(e.offset) end) end
-    for _,s in ipairs(RGB.strokes) do pcall(function() s.obj.Color=rgbColor(s.offset) end) end
+task.spawn(function()
+    while task.wait(0.066) do
+        if not RGB.enabled then continue end
+        for _,e in ipairs(RGB.elements) do pcall(function() e.obj[e.prop]=rgbColor(e.offset) end) end
+        for _,s in ipairs(RGB.strokes) do pcall(function() s.obj.Color=rgbColor(s.offset) end) end
+    end
 end)
 
 --========== UTILS ==========
 local function new(c,p,parent) local o=Instance.new(c); for k,v in pairs(p or {}) do o[k]=v end; if parent then o.Parent=parent end; return o end
 local function corner(p,r) return new("UICorner",{CornerRadius=UDim.new(0,r or 8)},p) end
-local function stroke(p,c,t,tr) return new("UIStroke",{Color=c or Theme.Stroke,Thickness=t or 1,Transparency=tr or 0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},p) end
 local function padding(p,a) return new("UIPadding",{PaddingTop=UDim.new(0,a),PaddingBottom=UDim.new(0,a),PaddingLeft=UDim.new(0,a),PaddingRight=UDim.new(0,a)},p) end
 local function tween(o,t,p,s,d) return TweenService:Create(o,TweenInfo.new(t,s or Enum.EasingStyle.Quint,d or Enum.EasingDirection.Out),p) end
 
@@ -80,8 +80,7 @@ local SIDEBAR_W = math.clamp(MENU_W*0.22,100,140)
 local FAB_SIZE = 54
 local fab = new("TextButton",{Name="FAB",Size=UDim2.new(0,FAB_SIZE,0,FAB_SIZE),Position=UDim2.new(0,Config.Settings.FABX,0,Config.Settings.FABY),BackgroundColor3=Theme.Accent,Text="E",Font=Enum.Font.GothamBlack,TextSize=20,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=20,Visible=false},gui)
 corner(fab,FAB_SIZE/2)
-local fabStroke = stroke(fab,Color3.new(1,1,1),1.2,0)
-addRGB(fab,"BackgroundColor3",0); addRGBStroke(fabStroke,0.15)
+addRGB(fab,"BackgroundColor3",0)
 
 local fabDragging, fabStart, fabStartPos, fabMoved
 fab.InputBegan:Connect(function(input)
@@ -104,9 +103,8 @@ UIS.InputEnded:Connect(function(input)
 end)
 
 --========== MENU ==========
-local root = new("Frame",{Name="Menu",Size=UDim2.new(0,MENU_W,0,MENU_H),Position=UDim2.new(0.5,-MENU_W/2,0.5,-MENU_H/2),BackgroundColor3=Color3.fromRGB(18,18,24),BorderSizePixel=0,Visible=false,ZIndex=25,ClipsDescendants=true},gui)
+local root = new("Frame",{Name="Menu",Size=UDim2.new(0,MENU_W,0,MENU_H),Position=UDim2.new(0.5,-MENU_W/2,0.5,-MENU_H/2),BackgroundColor3=Color3.fromRGB(18,18,24),BorderSizePixel=0,Visible=false,ZIndex=25,ClipsDescendants=false},gui)
 corner(root,14)
-local rootStroke = stroke(root,Theme.Stroke,1.5,0); addRGBStroke(rootStroke,0)
 
 local topGlow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=26},root)
 addRGB(topGlow,"BackgroundColor3",0.05)
@@ -114,7 +112,7 @@ addRGB(topGlow,"BackgroundColor3",0.05)
 local HEADER_H = 44
 local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
-local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v10",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
+local titleLbl = new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="RGB HUB v11",Font=Enum.Font.GothamBlack,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
 addRGB(titleLbl,"TextColor3",0.1)
 
 local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,-40,0.5,-15),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
@@ -125,7 +123,7 @@ local sidebar = new("Frame",{Size=UDim2.new(0,SIDEBAR_W,1,-HEADER_H),Position=UD
 padding(sidebar,8)
 new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
 
-local content = new("Frame",{Size=UDim2.new(1,-(SIDEBAR_W+10),1,-(HEADER_H+10)),Position=UDim2.new(0,SIDEBAR_W,0,HEADER_H),BackgroundTransparency=1,ZIndex=26,ClipsDescendants=true},root)
+local content = new("Frame",{Size=UDim2.new(1,-(SIDEBAR_W+10),1,-(HEADER_H+10)),Position=UDim2.new(0,SIDEBAR_W,0,HEADER_H),BackgroundTransparency=1,ZIndex=26,ClipsDescendants=false},root)
 
 local pages, tabButtons = {}, {}
 local tabsList = {
@@ -133,60 +131,38 @@ local tabsList = {
     {Name="Trigger",Icon="✹"},{Name="Colors",Icon="◐"},{Name="Settings",Icon="⚙"},
 }
 
---========== СТРАНИЦА СО СЛАЙДЕРОМ ПРОКРУТКИ ==========
+--========== СТРАНИЦА СО СЛАЙДЕРОМ ==========
 local function createPage(name)
-    local page = new("Frame",{
-        Name=name, Size=UDim2.fromScale(1,1),
-        BackgroundTransparency=1, BorderSizePixel=0,
-        Visible=false, ZIndex=27, ClipsDescendants=true
-    }, content)
-    local inner = new("Frame",{
-        Name="Inner", Size=UDim2.new(1,0,0,0),
-        BackgroundTransparency=1, BorderSizePixel=0,
-        Position=UDim2.new(0,0,0,0), ZIndex=27
-    }, page)
+    local page = new("Frame",{Name=name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,Visible=false,ZIndex=27,ClipsDescendants=true},content)
+    local inner = new("Frame",{Name="Inner",Size=UDim2.new(1,0,0,0),BackgroundTransparency=1,BorderSizePixel=0,Position=UDim2.new(0,0,0,0),ZIndex=27},page)
     local layout = new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},inner)
 
-    -- Полоса прокрутки справа
-    local scrollBar = new("Frame",{
-        Size=UDim2.new(0,4,1,-8), Position=UDim2.new(1,-8,0,4),
-        BackgroundColor3=Theme.Panel2, BorderSizePixel=0, ZIndex=40
-    }, page)
+    local scrollBar = new("Frame",{Size=UDim2.new(0,4,1,-8),Position=UDim2.new(1,-8,0,4),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=40},page)
     corner(scrollBar,2)
-
-    local scrollThumb = new("Frame",{
-        Size=UDim2.new(1,0,0,40), Position=UDim2.new(0,0,0,0),
-        BackgroundColor3=Theme.Accent, BorderSizePixel=0, ZIndex=41
-    }, scrollBar)
-    corner(scrollThumb,2)
-    addRGB(scrollThumb,"BackgroundColor3",math.random()*0.3)
+    local scrollThumb = new("Frame",{Size=UDim2.new(1,0,0,40),Position=UDim2.new(0,0,0,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=41},scrollBar)
+    corner(scrollThumb,2); addRGB(scrollThumb,"BackgroundColor3",math.random()*0.3)
 
     local scrollValue = 0
     local maxScroll = 0
-
     local function updateScroll()
         local contentH = layout.AbsoluteContentSize.Y + 12
         inner.Size = UDim2.new(1,0,0,contentH)
         maxScroll = math.max(0, contentH - page.AbsoluteSize.Y)
-        local thumbH = math.clamp(page.AbsoluteSize.Y / math.max(contentH,1), 0.08, 1) * page.AbsoluteSize.Y
+        local thumbH = math.clamp(page.AbsoluteSize.Y/math.max(contentH,1),0.08,1)*page.AbsoluteSize.Y
         scrollThumb.Size = UDim2.new(1,0,0,thumbH)
-        local thumbY = scrollValue * (page.AbsoluteSize.Y - thumbH)
+        local thumbY = scrollValue*(page.AbsoluteSize.Y-thumbH)
         scrollThumb.Position = UDim2.new(0,0,0,thumbY)
-        inner.Position = UDim2.new(0,0,0,-scrollValue * maxScroll)
+        inner.Position = UDim2.new(0,0,0,-scrollValue*maxScroll)
     end
-
     layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateScroll)
     page:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateScroll)
 
-    -- Тап по полосе
     scrollBar.InputBegan:Connect(function(input)
         if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then
             local relY = math.clamp((input.Position.Y-scrollBar.AbsolutePosition.Y)/scrollBar.AbsoluteSize.Y,0,1)
             scrollValue = relY; updateScroll()
         end
     end)
-
-    -- Драг ползунка
     local dragging = false
     scrollThumb.InputBegan:Connect(function(input)
         if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true end
@@ -223,7 +199,7 @@ for i,t in ipairs(tabsList) do
     onTap(btn, function() showPage(t.Name) end)
 end
 
---========== UI COMPONENTS ==========
+--========== UI COMPONENTS (без UIStroke) ==========
 local UI = {}
 local function getPageInner(page) return page:FindFirstChild("Inner") or page end
 
@@ -231,14 +207,14 @@ function UI.Section(page,text)
     local inner = getPageInner(page)
     local wrap = new("Frame",{Size=UDim2.new(1,0,0,24),BackgroundTransparency=1,ZIndex=27},inner)
     local bar = new("Frame",{Size=UDim2.new(0,3,0,12),Position=UDim2.new(0,4,0.5,-6),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},wrap)
-    corner(bar,2); addRGB(bar,"BackgroundColor3",math.random()*0.3)
+    corner(bar,2)
     local lbl = new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},wrap)
-    addRGB(lbl,"TextColor3",math.random()*0.3)
     return wrap
 end
 local function card(parent,h)
     local c = new("Frame",{Size=UDim2.new(1,0,0,h or 42),BackgroundColor3=Theme.Panel,BorderSizePixel=0,ZIndex=27},parent)
-    corner(c,10); local s = stroke(c,Theme.Stroke,1,0.5); addRGBStroke(s,math.random()*0.3); return c
+    corner(c,10)
+    return c
 end
 function UI.Toggle(page,label,default,callback)
     local inner = getPageInner(page)
@@ -271,11 +247,10 @@ function UI.Slider(page,label,min,max,default,callback)
     local c = card(inner,56)
     new("TextLabel",{Size=UDim2.new(1,-24,0,16),Position=UDim2.new(0,12,0,8),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local val = new("TextLabel",{Size=UDim2.new(0,44,0,16),Position=UDim2.new(1,-56,0,8),BackgroundTransparency=1,Text=tostring(default),Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
-    addRGB(val,"TextColor3",math.random()*0.3)
     local bar = new("Frame",{Size=UDim2.new(1,-24,0,6),Position=UDim2.new(0,12,0,38),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
     corner(bar,3)
     local fill = new("Frame",{Size=UDim2.new((default-min)/(max-min),0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},bar)
-    corner(fill,3); addRGB(fill,"BackgroundColor3",math.random()*0.3)
+    corner(fill,3)
     local thumb = new("Frame",{Size=UDim2.new(0,12,0,12),Position=UDim2.new((default-min)/(max-min),-6,0.5,-6),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},bar)
     corner(thumb,6)
     local value = default; local dragging = false
@@ -305,7 +280,6 @@ function UI.Dropdown(page,label,options,default,callback)
     new("TextLabel",{Size=UDim2.new(1,-110,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local current = default or options[1]
     local valLbl = new("TextLabel",{Size=UDim2.new(0,80,1,0),Position=UDim2.new(1,-96,0,0),BackgroundTransparency=1,Text=current,Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
-    addRGB(valLbl,"TextColor3",math.random()*0.3)
     new("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(1,-14,0,0),BackgroundTransparency=1,Text="▾",Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.TextDim,ZIndex=28},c)
     local openHit = new("TextButton",{Size=UDim2.new(1,-56,1,0),Position=UDim2.new(0,0,0,0),BackgroundTransparency=1,Text="",ZIndex=76},c)
     local expanded = false
@@ -336,7 +310,7 @@ function UI.ColorPicker(page,label,default,callback)
     local c = card(inner,42)
     new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local sw = new("TextButton",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,Text="",AutoButtonColor=false,ZIndex=80},c)
-    corner(sw,6); local swStroke = stroke(sw,Theme.Stroke,1); addRGBStroke(swStroke,math.random()*0.3)
+    corner(sw,6)
     local expanded = false
     local picker = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=80},c)
     corner(picker,10); padding(picker,8)
@@ -348,7 +322,7 @@ function UI.ColorPicker(page,label,default,callback)
         local bar = new("Frame",{Size=UDim2.new(1,-36,0,5),Position=UDim2.new(0,34,0.5,-2.5),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=81},f)
         corner(bar,3)
         local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=81},bar)
-        corner(fill,3); addRGB(fill,"BackgroundColor3",math.random()*0.3)
+        corner(fill,3)
         local hit = new("TextButton",{Size=UDim2.new(1,0,0,20),Position=UDim2.new(0,0,-6,0),BackgroundTransparency=1,Text="",ZIndex=85},f)
         local drag = false
         local function upd(x) local rel=math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1); fill.Size=UDim2.new(rel,0,1,0); cb(rel) end
@@ -437,7 +411,7 @@ onTap(fab, function()
 end)
 
 --============================================================
---  ESP LOGIC (без изменений)
+--  ESP LOGIC (30 Hz + боты раз в 0.5с)
 --============================================================
 local ESP_Store = {}
 local Chams_Store = {}
@@ -619,34 +593,41 @@ local function updateChams(player,char)
     Chams_Store[player].FillColor = Config.Colors.Chams
 end
 
+local botScanTime = 0
 local function updateBots()
     if not Config.Visual.Enabled or not Config.Visual.Bots then
         for obj,s in pairs(BOT_Store) do hideESP(s) end
         return
     end
-    local current = {}
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and not Players:GetPlayerFromCharacter(obj) then
-            current[obj] = true
-            updateESPGeneric(BOT_Store, obj, obj, true)
+    if tick() - botScanTime > 0.5 then
+        botScanTime = tick()
+        local current = {}
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if obj:IsA("Model") and obj:FindFirstChildOfClass("Humanoid") and obj:FindFirstChild("HumanoidRootPart") and not Players:GetPlayerFromCharacter(obj) then
+                current[obj] = true
+                updateESPGeneric(BOT_Store, obj, obj, true)
+            end
         end
-    end
-    for obj,s in pairs(BOT_Store) do
-        if not current[obj] or not obj.Parent then removeESPObjects(BOT_Store, obj) end
+        for obj,s in pairs(BOT_Store) do
+            if not current[obj] or not obj.Parent then removeESPObjects(BOT_Store, obj) end
+        end
     end
 end
 
-RunService.RenderStepped:Connect(function()
-    for _,p in ipairs(Players:GetPlayers()) do
-        local char = p.Character
-        if p==LocalPlayer then
-            if ESP_Store[p] then hideESP(ESP_Store[p]) end
-        else
-            updateESPGeneric(ESP_Store, p, char, false)
+-- ESP 30 Hz
+task.spawn(function()
+    while task.wait(0.033) do
+        for _,p in ipairs(Players:GetPlayers()) do
+            local char = p.Character
+            if p==LocalPlayer then
+                if ESP_Store[p] then hideESP(ESP_Store[p]) end
+            else
+                updateESPGeneric(ESP_Store, p, char, false)
+            end
+            updateChams(p,char)
         end
-        updateChams(p,char)
+        pcall(updateBots)
     end
-    pcall(updateBots)
 end)
 Players.PlayerRemoving:Connect(function(p)
     removeESPObjects(ESP_Store, p)
@@ -675,8 +656,8 @@ local function collectTargets(cfg)
         end
     end
     if cfg.TargetBots then
-        for _, obj in ipairs(workspace:GetChildren()) do
-            if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
+        for obj,s in pairs(BOT_Store) do
+            if obj.Parent then
                 local part = obj:FindFirstChild(cfg.Part)
                 local hum = obj:FindFirstChildOfClass("Humanoid")
                 if part and hum and hum.Health>0 then table.insert(list,{part=part, hum=hum, char=obj}) end
@@ -801,4 +782,4 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-print("[RGB HUB v10] Loaded. Scroll slider per tab, MaxDistance, onTap.")
+print("[RGB HUB v11 OPTIMIZED] Loaded. RGB 15Hz, ESP 30Hz, bots 0.5s.")
