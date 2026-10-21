@@ -1,7 +1,7 @@
 --============================================================
---  ESP HUB MOBILE — DELTA OPTIMIZED
---  Меню сразу открыто. Крестик → FAB. Тап по FAB → меню.
---  ESP (Box=4 линии, HP=2 линии) / Chams / Aimbot / Silent / Trigger
+--  ESP HUB MOBILE — DELTA FINAL ADAPTIVE
+--  Меню по центру, горизонтальное, адаптивное под экран
+--  При запуске меню открыто, крестик -> FAB, тап по FAB -> меню
 --============================================================
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -41,11 +41,10 @@ local Theme = {
 local function new(c,p,parent) local o=Instance.new(c); for k,v in pairs(p or {}) do o[k]=v end; if parent then o.Parent=parent end; return o end
 local function corner(p,r) return new("UICorner",{CornerRadius=UDim.new(0,r or 8)},p) end
 local function stroke(p,c,t,tr) return new("UIStroke",{Color=c or Theme.Stroke,Thickness=t or 1,Transparency=tr or 0,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},p) end
-local function gradient(p,c1,c2,rot) return new("UIGradient",{Color=ColorSequence.new(c1,c2),Rotation=rot or 90},p) end
 local function padding(p,a) return new("UIPadding",{PaddingTop=UDim.new(0,a),PaddingBottom=UDim.new(0,a),PaddingLeft=UDim.new(0,a),PaddingRight=UDim.new(0,a)},p) end
 local function tween(o,t,p,s,d) return TweenService:Create(o,TweenInfo.new(t,s or Enum.EasingStyle.Quint,d or Enum.EasingDirection.Out),p) end
 
---========== CONFIG SAVE (без автоцикла) ==========
+--========== CONFIG SAVE ==========
 local CONFIG_PATH = "Delta_ESP_Config.json"
 local function saveConfig()
     if not writefile then return end
@@ -68,6 +67,16 @@ end
 if CoreGui:FindFirstChild("Delta_ESP_Hub") then CoreGui.Delta_ESP_Hub:Destroy() end
 local gui = new("ScreenGui",{Name="Delta_ESP_Hub",ResetOnSpawn=false,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},CoreGui)
 
+--========== АДАПТИВНЫЕ РАЗМЕРЫ ==========
+local function getMenuSize()
+    local vp = Camera.ViewportSize
+    local w = math.clamp(vp.X * 0.92, 320, 640)
+    local h = math.clamp(vp.Y * 0.75, 260, 420)
+    return w, h
+end
+local MENU_W, MENU_H = getMenuSize()
+local SIDEBAR_W = math.clamp(MENU_W * 0.22, 100, 140)
+
 --========== FAB ==========
 local FAB_SIZE = 54
 local fab = new("TextButton",{
@@ -77,7 +86,7 @@ local fab = new("TextButton",{
     Font=Enum.Font.GothamBlack, TextSize=20, TextColor3=Color3.new(1,1,1),
     AutoButtonColor=false, ZIndex=20, Visible=false
 },gui)
-corner(fab,FAB_SIZE/2); gradient(fab,Theme.Accent,Theme.Accent2,45); stroke(fab,Color3.new(1,1,1),1,0.7)
+corner(fab,FAB_SIZE/2); stroke(fab,Color3.new(1,1,1),1,0.7)
 
 local fabDragging, fabStart, fabStartPos, fabMoved
 fab.InputBegan:Connect(function(input)
@@ -102,38 +111,49 @@ UIS.InputEnded:Connect(function(input)
     end
 end)
 
---========== MENU ==========
+--========== MENU (по центру, горизонтальное, адаптивное) ==========
 local root = new("Frame",{
-    Name="Menu", Size=UDim2.new(0.92,0,0.85,0),
-    Position=UDim2.new(0.5,-0.46,0.5,-0.425),
-    BackgroundColor3=Theme.Bg, BorderSizePixel=0, Visible=false, ZIndex=25, ClipsDescendants=true
+    Name="Menu",
+    Size=UDim2.new(0, MENU_W, 0, MENU_H),
+    Position=UDim2.new(0.5, -MENU_W/2, 0.5, -MENU_H/2),
+    BackgroundColor3=Color3.fromRGB(18,18,24), BorderSizePixel=0, Visible=false,
+    ZIndex=25, ClipsDescendants=true
 },gui)
-corner(root,14); stroke(root,Theme.Stroke,1); gradient(root,Color3.fromRGB(22,22,30),Color3.fromRGB(12,12,16),90)
-local topGlow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=26},root)
-gradient(topGlow,Theme.Accent,Theme.Accent2,0)
+corner(root,14); stroke(root,Theme.Stroke,1)
 
-local header = new("Frame",{Size=UDim2.new(1,0,0,48),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
+local topGlow = new("Frame",{Size=UDim2.new(1,0,0,2),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=26},root)
+
+-- Header
+local HEADER_H = 44
+local header = new("Frame",{Size=UDim2.new(1,0,0,HEADER_H),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26},root)
 corner(header,14)
 new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text="ESP HUB (DELTA)",Font=Enum.Font.GothamBlack,TextSize=14,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=27},header)
-local closeBtn = new("TextButton",{Size=UDim2.new(0,32,0,32),Position=UDim2.new(1,-42,0.5,-16),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
-corner(closeBtn,16)
+local closeBtn = new("TextButton",{Size=UDim2.new(0,30,0,30),Position=UDim2.new(1,-40,0.5,-15),BackgroundColor3=Theme.Danger,Text="✕",Font=Enum.Font.GothamBold,TextSize=16,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},header)
+corner(closeBtn,15)
 closeBtn.MouseButton1Click:Connect(function() root.Visible=false; fab.Visible=true end)
 
-local tabsScroll = new("ScrollingFrame",{
-    Size=UDim2.new(1,0,0,40),Position=UDim2.new(0,0,0,48),
-    BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ScrollBarThickness=0,
-    CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.X,
-    ScrollingDirection=Enum.ScrollingDirection.X, ZIndex=26
+-- Левая панель вкладок
+local sidebar = new("Frame",{
+    Size=UDim2.new(0, SIDEBAR_W, 1, -HEADER_H),
+    Position=UDim2.new(0,0,0,HEADER_H),
+    BackgroundColor3=Theme.Bg2,BorderSizePixel=0,ZIndex=26
 },root)
-new("UIListLayout",{Padding=UDim.new(0,6),FillDirection=Enum.FillDirection.Horizontal,SortOrder=Enum.SortOrder.LayoutOrder,VerticalAlignment=Enum.VerticalAlignment.Center},tabsScroll)
-padding(tabsScroll,8)
+padding(sidebar,8)
+new("UIListLayout",{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder},sidebar)
+
+-- Правая панель контента
+local content = new("Frame",{
+    Size=UDim2.new(1, -(SIDEBAR_W+10), 1, -(HEADER_H+10)),
+    Position=UDim2.new(0, SIDEBAR_W, 0, HEADER_H),
+    BackgroundTransparency=1,ZIndex=26,ClipsDescendants=true
+},root)
 
 local pages, tabButtons = {}, {}
-local content = new("Frame",{Size=UDim2.new(1,0,1,-88),Position=UDim2.new(0,0,0,88),BackgroundTransparency=1,ZIndex=26,ClipsDescendants=true},root)
 local tabsList = {
     {Name="Visual",Icon="◉"},{Name="Aimbot",Icon="✜"},{Name="Silent",Icon="◈"},
     {Name="Trigger",Icon="✹"},{Name="Colors",Icon="◐"},{Name="Settings",Icon="⚙"},
 }
+
 local function showPage(name)
     for n,p in pairs(pages) do p.Visible=false end
     local page = pages[name]; if not page then return end
@@ -143,63 +163,77 @@ local function showPage(name)
         tween(b,0.18,{BackgroundColor3=active and Theme.Accent or Theme.Panel,TextColor3=active and Color3.new(1,1,1) or Theme.TextDim}):Play()
     end
 end
+
 for i,t in ipairs(tabsList) do
-    local btn = new("TextButton",{Size=UDim2.new(0,92,0,30),BackgroundColor3=Theme.Panel,Text=t.Icon.." "..t.Name,Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.TextDim,AutoButtonColor=false,ZIndex=27},tabsScroll)
-    corner(btn,15)
+    local btn = new("TextButton",{
+        Size=UDim2.new(1,0,0,32),BackgroundColor3=Theme.Panel,
+        Text=t.Icon.."  "..t.Name,
+        Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.TextDim,
+        TextXAlignment=Enum.TextXAlignment.Left,AutoButtonColor=false,ZIndex=27
+    },sidebar)
+    corner(btn,8)
+    padding(btn,8)
     tabButtons[t.Name]=btn
-    local page = new("ScrollingFrame",{Name=t.Name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=2,ScrollBarImageColor3=Theme.Accent,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,Visible=false,ZIndex=27,ScrollBarImageTransparency=0.4},content)
-    padding(page,8)
+
+    local page = new("ScrollingFrame",{
+        Name=t.Name,Size=UDim2.fromScale(1,1),BackgroundTransparency=1,BorderSizePixel=0,
+        ScrollBarThickness=2,ScrollBarImageColor3=Theme.Accent,
+        CanvasSize=UDim2.new(0,0,0,2000),
+        Visible=false,ZIndex=27,ScrollBarImageTransparency=0.4
+    },content)
+    padding(page,6)
     new("UIListLayout",{Padding=UDim.new(0,6),SortOrder=Enum.SortOrder.LayoutOrder},page)
     pages[t.Name]=page
+
     btn.MouseButton1Click:Connect(function() showPage(t.Name) end)
 end
 
 --========== UI COMPONENTS ==========
 local UI = {}
 function UI.Section(page,text)
-    local wrap = new("Frame",{Size=UDim2.new(1,0,0,26),BackgroundTransparency=1,ZIndex=27},page)
+    local wrap = new("Frame",{Size=UDim2.new(1,0,0,24),BackgroundTransparency=1,ZIndex=27},page)
     local bar = new("Frame",{Size=UDim2.new(0,3,0,12),Position=UDim2.new(0,4,0.5,-6),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},wrap)
-    corner(bar,2); gradient(bar,Theme.Accent,Theme.Accent2,90)
-    new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},wrap)
+    corner(bar,2)
+    new("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},wrap)
     return wrap
 end
 local function card(page,h)
-    local c = new("Frame",{Size=UDim2.new(1,0,0,h or 46),BackgroundColor3=Theme.Panel,BorderSizePixel=0,ZIndex=27},page)
+    local c = new("Frame",{Size=UDim2.new(1,0,0,h or 42),BackgroundColor3=Theme.Panel,BorderSizePixel=0,ZIndex=27},page)
     corner(c,10); stroke(c,Theme.Stroke,1,0.5); return c
 end
 function UI.Toggle(page,label,default,callback)
-    local c = card(page,46)
-    new("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
+    local c = card(page,42)
+    new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local state = default or false
-    local track = new("Frame",{Size=UDim2.new(0,46,0,24),Position=UDim2.new(1,-60,0.5,-12),BackgroundColor3=state and Theme.Accent or Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
-    corner(track,12)
-    local knob = new("Frame",{Size=UDim2.new(0,20,0,20),Position=state and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},track)
-    corner(knob,10)
+    local track = new("Frame",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=state and Theme.Accent or Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
+    corner(track,11)
+    local knob = new("Frame",{Size=UDim2.new(0,18,0,18),Position=state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},track)
+    corner(knob,9)
     local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=30},c)
     hit.MouseButton1Click:Connect(function()
         state = not state
         tween(track,0.22,{BackgroundColor3=state and Theme.Accent or Theme.Panel2}):Play()
-        tween(knob,0.22,{Position=state and UDim2.new(1,-22,0.5,-10) or UDim2.new(0,2,0.5,-10)}):Play()
+        tween(knob,0.22,{Position=state and UDim2.new(1,-20,0.5,-9) or UDim2.new(0,2,0.5,-9)}):Play()
         if callback then callback(state) end
     end)
     return c
 end
 function UI.Slider(page,label,min,max,default,callback)
-    local c = card(page,60)
-    new("TextLabel",{Size=UDim2.new(1,-24,0,18),Position=UDim2.new(0,14,0,8),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
-    local val = new("TextLabel",{Size=UDim2.new(0,50,0,18),Position=UDim2.new(1,-64,0,8),BackgroundTransparency=1,Text=tostring(default),Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
-    local bar = new("Frame",{Size=UDim2.new(1,-28,0,8),Position=UDim2.new(0,14,0,40),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
-    corner(bar,4)
+    local c = card(page,56)
+    new("TextLabel",{Size=UDim2.new(1,-24,0,16),Position=UDim2.new(0,12,0,8),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
+    local val = new("TextLabel",{Size=UDim2.new(0,44,0,16),Position=UDim2.new(1,-56,0,8),BackgroundTransparency=1,Text=tostring(default),Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
+    local bar = new("Frame",{Size=UDim2.new(1,-24,0,6),Position=UDim2.new(0,12,0,38),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=28},c)
+    corner(bar,3)
     local fill = new("Frame",{Size=UDim2.new((default-min)/(max-min),0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=28},bar)
-    corner(fill,4); gradient(fill,Theme.Accent,Theme.Accent2,0)
-    local thumb = new("Frame",{Size=UDim2.new(0,16,0,16),Position=UDim2.new((default-min)/(max-min),-8,0.5,-8),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},bar)
-    corner(thumb,8)
+    corner(fill,3)
+    local thumb = new("Frame",{Size=UDim2.new(0,12,0,12),Position=UDim2.new((default-min)/(max-min),-6,0.5,-6),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=29},bar)
+    corner(thumb,6)
     local value = default; local dragging = false
-    local hit = new("TextButton",{Size=UDim2.new(1,0,0,34),Position=UDim2.new(0,0,0,24),BackgroundTransparency=1,Text="",ZIndex=30},c)
+    local hit = new("TextButton",{Size=UDim2.new(1,0,0,30),Position=UDim2.new(0,0,0,24),BackgroundTransparency=1,Text="",ZIndex=30},c)
     local function upd(x)
         local rel = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
         value = math.floor(min+(max-min)*rel+0.5)
-        fill.Size = UDim2.new(rel,0,1,0); thumb.Position = UDim2.new(rel,-8,0.5,-8); val.Text = tostring(value)
+        fill.Size = UDim2.new(rel,0,1,0); thumb.Position = UDim2.new(rel,-6,0.5,-6); val.Text = tostring(value)
         if callback then callback(value) end
     end
     hit.InputBegan:Connect(function(input) if input.UserInputType==Enum.UserInputType.Touch or input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; upd(input.Position.X) end end)
@@ -208,55 +242,55 @@ function UI.Slider(page,label,min,max,default,callback)
     return c
 end
 function UI.Button(page,label,callback,color)
-    local b = new("TextButton",{Size=UDim2.new(1,0,0,40),BackgroundColor3=color or Theme.Accent,Text=label,Font=Enum.Font.GothamBold,TextSize=13,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},page)
-    corner(b,10); gradient(b,color or Theme.Accent,color or Theme.Accent2,0)
+    local b = new("TextButton",{Size=UDim2.new(1,0,0,36),BackgroundColor3=color or Theme.Accent,Text=label,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Color3.new(1,1,1),AutoButtonColor=false,ZIndex=27},page)
+    corner(b,10)
     b.MouseButton1Click:Connect(function() if callback then callback() end end); return b
 end
 function UI.Dropdown(page,label,options,default,callback)
-    local c = card(page,46)
-    new("TextLabel",{Size=UDim2.new(1,-130,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
+    local c = card(page,42)
+    new("TextLabel",{Size=UDim2.new(1,-110,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
     local current = default or options[1]
-    local valLbl = new("TextLabel",{Size=UDim2.new(0,100,1,0),Position=UDim2.new(1,-120,0,0),BackgroundTransparency=1,Text=current,Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
-    new("TextLabel",{Size=UDim2.new(0,16,1,0),Position=UDim2.new(1,-18,0,0),BackgroundTransparency=1,Text="▾",Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.TextDim,ZIndex=28},c)
+    local valLbl = new("TextLabel",{Size=UDim2.new(0,80,1,0),Position=UDim2.new(1,-96,0,0),BackgroundTransparency=1,Text=current,Font=Enum.Font.GothamBold,TextSize=11,TextColor3=Theme.Accent,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=28},c)
+    new("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(1,-14,0,0),BackgroundTransparency=1,Text="▾",Font=Enum.Font.GothamBold,TextSize=10,TextColor3=Theme.TextDim,ZIndex=28},c)
     local expanded = false
-    local list = new("Frame",{Size=UDim2.new(1,-20,0,0),Position=UDim2.new(0,10,0,50),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=29},c)
+    local list = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=29},c)
     corner(list,10); padding(list,6)
     new("UIListLayout",{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder},list)
     for _,opt in ipairs(options) do
-        local ob = new("TextButton",{Size=UDim2.new(1,0,0,32),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=30},list)
+        local ob = new("TextButton",{Size=UDim2.new(1,0,0,28),BackgroundColor3=Theme.Panel,Text=opt,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.Text,AutoButtonColor=false,ZIndex=30},list)
         corner(ob,8)
         ob.MouseButton1Click:Connect(function()
             current = opt; valLbl.Text = opt
             if callback then callback(opt) end
             expanded = false
-            tween(list,0.2,{Size=UDim2.new(1,-20,0,0)}):Play()
-            tween(c,0.2,{Size=UDim2.new(1,0,0,46)}):Play()
+            tween(list,0.2,{Size=UDim2.new(1,-16,0,0)}):Play()
+            tween(c,0.2,{Size=UDim2.new(1,0,0,42)}):Play()
             task.wait(0.2); list.Visible=false
         end)
     end
     local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=31},c)
     hit.MouseButton1Click:Connect(function()
         expanded = not expanded; list.Visible = expanded
-        local h = math.min(#options*36+12, 200)
-        tween(list,0.22,{Size=UDim2.new(1,-20,0,expanded and h or 0)}):Play()
-        tween(c,0.22,{Size=UDim2.new(1,0,0,expanded and (46+h+6) or 46)}):Play()
+        local h = math.min(#options*32+12, 180)
+        tween(list,0.22,{Size=UDim2.new(1,-16,0,expanded and h or 0)}):Play()
+        tween(c,0.22,{Size=UDim2.new(1,0,0,expanded and (42+h+6) or 42)}):Play()
     end)
     return c
 end
 function UI.ColorPicker(page,label,default,callback)
-    local c = card(page,46)
-    new("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=13,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
-    local sw = new("Frame",{Size=UDim2.new(0,48,0,24),Position=UDim2.new(1,-62,0.5,-12),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,ZIndex=28},c)
+    local c = card(page,42)
+    new("TextLabel",{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,12,0,0),BackgroundTransparency=1,Text=label,Font=Enum.Font.GothamMedium,TextSize=12,TextColor3=Theme.Text,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=28},c)
+    local sw = new("Frame",{Size=UDim2.new(0,42,0,22),Position=UDim2.new(1,-54,0.5,-11),BackgroundColor3=default or Color3.new(1,1,1),BorderSizePixel=0,ZIndex=28},c)
     corner(sw,6); stroke(sw,Theme.Stroke,1)
     local expanded = false
-    local picker = new("Frame",{Size=UDim2.new(1,-20,0,0),Position=UDim2.new(0,10,0,50),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=29},c)
+    local picker = new("Frame",{Size=UDim2.new(1,-16,0,0),Position=UDim2.new(0,8,0,46),BackgroundColor3=Theme.Bg2,BorderSizePixel=0,Visible=false,ClipsDescendants=true,ZIndex=29},c)
     corner(picker,10); padding(picker,8)
     local h,s,v = (default or Color3.new(1,1,1)):ToHSV()
     local function apply() local col=Color3.fromHSV(h,s,v); sw.BackgroundColor3=col; if callback then callback(col) end end
     local function hsvSlider(name,idx,def,cb)
-        local f = new("Frame",{Size=UDim2.new(1,0,0,26),Position=UDim2.new(0,0,0,idx*28),BackgroundTransparency=1,ZIndex=30},picker)
-        new("TextLabel",{Size=UDim2.new(0,34,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=11,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=30},f)
-        local bar = new("Frame",{Size=UDim2.new(1,-44,0,6),Position=UDim2.new(0,40,0.5,-3),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=30},f)
+        local f = new("Frame",{Size=UDim2.new(1,0,0,24),Position=UDim2.new(0,0,0,idx*26),BackgroundTransparency=1,ZIndex=30},picker)
+        new("TextLabel",{Size=UDim2.new(0,30,1,0),BackgroundTransparency=1,Text=name,Font=Enum.Font.GothamMedium,TextSize=10,TextColor3=Theme.TextDim,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=30},f)
+        local bar = new("Frame",{Size=UDim2.new(1,-36,0,5),Position=UDim2.new(0,34,0.5,-2.5),BackgroundColor3=Theme.Panel2,BorderSizePixel=0,ZIndex=30},f)
         corner(bar,3)
         local fill = new("Frame",{Size=UDim2.new(def,0,1,0),BackgroundColor3=Theme.Accent,BorderSizePixel=0,ZIndex=30},bar)
         corner(fill,3)
@@ -273,8 +307,8 @@ function UI.ColorPicker(page,label,default,callback)
     local hit = new("TextButton",{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,Text="",ZIndex=31},c)
     hit.MouseButton1Click:Connect(function()
         expanded = not expanded; picker.Visible = expanded
-        tween(picker,0.25,{Size=UDim2.new(1,-20,0,expanded and 90 or 0)}):Play()
-        tween(c,0.25,{Size=UDim2.new(1,0,0,expanded and 140 or 46)}):Play()
+        tween(picker,0.25,{Size=UDim2.new(1,-16,0,expanded and 84 or 0)}):Play()
+        tween(c,0.25,{Size=UDim2.new(1,0,0,expanded and 132 or 42)}):Play()
     end)
     return c
 end
@@ -343,11 +377,10 @@ UI.Button(pages.Settings,"Destroy Hub",function() gui:Destroy() end,Theme.Danger
 
 showPage("Visual")
 
---========== СТАРТ: меню открыто, FAB скрыт ==========
+--========== СТАРТ ==========
 root.Visible = true
 fab.Visible = false
 
---========== FAB click ==========
 fab.MouseButton1Click:Connect(function()
     if fabMoved then return end
     root.Visible = true
@@ -356,7 +389,7 @@ fab.MouseButton1Click:Connect(function()
 end)
 
 --============================================================
---  ESP LOGIC (Box=4 линии, HP=2 линии, Fonts.UI)
+--  ESP LOGIC
 --============================================================
 local ESP_Store = {}
 local Chams_Store = {}
@@ -377,19 +410,14 @@ local R15_SKELETON = {
     {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
     {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
 }
-local R6_SKELETON = {
-    {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"},
-}
-local function getSkeletonConnections(char)
-    if char:FindFirstChild("UpperTorso") then return R15_SKELETON else return R6_SKELETON end
-end
+local R6_SKELETON = {{"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"}}
+local function getSkeletonConnections(char) if char:FindFirstChild("UpperTorso") then return R15_SKELETON else return R6_SKELETON end end
 
 local function createESPObjects(player)
     if ESP_Store[player] then return end
     local s = {
         box_lines = {Drawing.new("Line"),Drawing.new("Line"),Drawing.new("Line"),Drawing.new("Line")},
-        tracer = newLine(Config.Colors.Tracer,1),
-        skeleton = {},
+        tracer = newLine(Config.Colors.Tracer,1), skeleton = {},
         hp_back_line = Drawing.new("Line"), hp_fill_line = Drawing.new("Line"),
         name = newText(14,Config.Colors.Name), dist = newText(12,Config.Colors.Distance),
     }
@@ -433,7 +461,6 @@ local function updateESP(player,char)
     local hrpScreen = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0,3,0))
     local onScreen = headScreen.Z>0 and hrpScreen.Z>0
 
-    -- Box = 4 линии
     if Config.Visual.Enabled and Config.Visual.Box and onScreen then
         local height = math.abs(headScreen.Y-hrpScreen.Y)
         local width = height*0.45
@@ -448,7 +475,6 @@ local function updateESP(player,char)
         for _,l in ipairs(L) do l.Color = Config.Colors.Box; l.Visible = true end
     else for _,l in ipairs(s.box_lines) do l.Visible=false end end
 
-    -- Skeleton
     if Config.Visual.Enabled and Config.Visual.Skeleton then
         local conns = getSkeletonConnections(char)
         for i=1,#s.skeleton do s.skeleton[i].Visible=false end
@@ -467,7 +493,6 @@ local function updateESP(player,char)
         end
     else for _,l in pairs(s.skeleton) do l.Visible=false end end
 
-    -- Tracer
     if Config.Visual.Enabled and Config.Visual.Tracer then
         local toPos = Camera:WorldToViewportPoint(torso.Position)
         if toPos.Z>0 then
@@ -478,7 +503,6 @@ local function updateESP(player,char)
         else s.tracer.Visible=false end
     else s.tracer.Visible=false end
 
-    -- HP = 2 линии
     if Config.Visual.Enabled and Config.Visual.HP and Config.Visual.Box and onScreen then
         local height = math.abs(headScreen.Y-hrpScreen.Y)
         local width = height*0.45
@@ -491,7 +515,6 @@ local function updateESP(player,char)
         s.hp_fill_line.Color = Config.Colors.HP; s.hp_fill_line.Visible = true
     else s.hp_back_line.Visible=false; s.hp_fill_line.Visible=false end
 
-    -- Name
     if Config.Visual.Enabled and Config.Visual.Names and onScreen then
         local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
         if top.Z>0 then
@@ -500,7 +523,6 @@ local function updateESP(player,char)
         else s.name.Visible=false end
     else s.name.Visible=false end
 
-    -- Distance
     if Config.Visual.Enabled and Config.Visual.Distance and onScreen then
         local top = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,head.Size.Y/2+1.2,0))
         if top.Z>0 then
@@ -545,7 +567,7 @@ Players.PlayerAdded:Connect(function(p)
     end)
 end)
 
---========== TARGET SELECTION ==========
+--========== TARGET ==========
 local function isVisible(part)
     if not part then return false end
     local origin = Camera.CFrame.Position
@@ -698,7 +720,7 @@ oldIndex = hookmetamethod(game,"__index",function(self,key)
     return oldIndex(self,key)
 end)
 
---========== TRIGGER BOT ==========
+--========== TRIGGER ==========
 local lastTrigger = 0
 RunService.RenderStepped:Connect(function()
     if not Config.Trigger.Enabled then return end
